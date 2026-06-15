@@ -1,0 +1,23 @@
+<!-- IMPORTANT ORDER -->
+<script src="three.r134.min.js"></script>
+<script src="vanta.fog.min.js"></script>
+
+<script>
+window.addEventListener("load", () => {
+  VANTA.FOG({
+    el: "#bg",
+
+    mouseControls: true,
+    touchControls: true,
+    gyroControls: false,
+
+    highlightColor: 0x48b8e3,
+    midtoneColor: 0xa3cfff,   // FIXED (your baby blue)
+    lowlightColor: 0x28b1a6,
+    baseColor: 0xffffff,
+
+    blurFactor: 0.6,
+    speed: 1.0
+  });
+});
+</script>
