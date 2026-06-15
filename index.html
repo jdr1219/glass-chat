@@ -1,23 +1,128 @@
-<!-- IMPORTANT ORDER -->
-<script src="three.r134.min.js"></script>
-<script src="vanta.fog.min.js"></script>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<title>Glass Chat</title>
+
+<style>
+body { margin:0; overflow:hidden; font-family:Arial; }
+
+#bg {
+  position:fixed;
+  width:100vw;
+  height:100vh;
+}
+
+.app {
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  width:450px;
+  height:650px;
+
+  background:rgba(255,255,255,0.08);
+  backdrop-filter:blur(25px);
+  border-radius:24px;
+  border:1px solid rgba(255,255,255,0.2);
+
+  display:flex;
+  flex-direction:column;
+}
+
+.header {
+  padding:12px;
+  color:white;
+  background:rgba(0,0,0,0.3);
+}
+
+.messages {
+  flex:1;
+  padding:10px;
+  overflow-y:auto;
+  color:white;
+}
+
+.msg {
+  padding:8px 12px;
+  margin:6px 0;
+  border-radius:12px;
+  background:rgba(255,255,255,0.15);
+}
+
+.input {
+  display:flex;
+  padding:10px;
+  background:rgba(0,0,0,0.3);
+}
+
+input {
+  flex:1;
+  padding:10px;
+  border:none;
+  border-radius:10px;
+  background:rgba(255,255,255,0.2);
+  color:white;
+}
+
+button {
+  margin-left:8px;
+  background:#48b8e3;
+  border:none;
+  border-radius:10px;
+  color:white;
+  padding:10px;
+  cursor:pointer;
+}
+</style>
+</head>
+
+<body>
+
+<div id="bg"></div>
+
+<div class="app">
+  <div class="header">Glass Chat</div>
+  <div class="messages" id="messages"></div>
+
+  <div class="input">
+    <input id="text" placeholder="Message..." />
+    <button onclick="send()">Send</button>
+  </div>
+</div>
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 
 <script>
-window.addEventListener("load", () => {
-  VANTA.FOG({
-    el: "#bg",
+const socket = io("YOUR_RENDER_URL_HERE"); 
+const box = document.getElementById("messages");
 
-    mouseControls: true,
-    touchControls: true,
-    gyroControls: false,
+let user = "User" + Math.floor(Math.random()*9999);
 
-    highlightColor: 0x48b8e3,
-    midtoneColor: 0xa3cfff,   // FIXED (your baby blue)
-    lowlightColor: 0x28b1a6,
-    baseColor: 0xffffff,
+function add(msg){
+  const div = document.createElement("div");
+  div.className = "msg";
+  div.innerText = msg;
+  box.appendChild(div);
+  box.scrollTop = 999999;
+}
 
-    blurFactor: 0.6,
-    speed: 1.0
+function send(){
+  const input = document.getElementById("text");
+  if(!input.value) return;
+
+  socket.emit("message", {
+    user,
+    text: input.value
   });
+
+  input.value = "";
+}
+
+socket.on("message", (data) => {
+  add(data.user + ": " + data.text);
 });
 </script>
+
+</body>
+</html>
