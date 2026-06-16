@@ -1,193 +1,213 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Glass Chat</title>
-  <link rel="icon" type="image/x-icon" href="favicon.ico" />
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/x-icon" href="favicon.ico"/>
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png"/>
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --blue:        #48b8e3;
+      --teal:        #28b1a6;
+      --glass:       rgba(5,12,26,0.84);
+      --own-bg:      rgba(72,184,227,0.20);
+      --own-border:  rgba(72,184,227,0.36);
+      --recv-bg:     rgba(210,220,235,0.13);
+      --recv-border: rgba(210,220,235,0.21);
+      --spring:      cubic-bezier(0.34,1.56,0.64,1);
+      --smooth:      cubic-bezier(0.16,1,0.3,1);
+      --snappy:      cubic-bezier(0.4,0,0.2,1);
+    }
+
+    *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
 
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      overflow: hidden; min-height: 100vh; background: #050e1c;
+      font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+      overflow:hidden; min-height:100vh; background:#040c18;
     }
 
-    #bg { position: fixed; inset: 0; z-index: 0; }
-    #pcanvas { position: fixed; inset: 0; z-index: 999; pointer-events: none; }
+    #bg    { position:fixed; inset:0; z-index:0; }
+    #pcanvas { position:fixed; inset:0; z-index:999; pointer-events:none; }
 
     .screen {
-      position: fixed; inset: 0; z-index: 10;
-      display: flex; align-items: center; justify-content: center; padding: 16px;
+      position:fixed; inset:0; z-index:10;
+      display:flex; align-items:center; justify-content:center; padding:16px;
     }
-    .screen.hidden { display: none; }
+    .screen.hidden { display:none; }
 
+    /* ── Glass surface ───────────────────── */
     .glass {
-      background: rgba(5, 12, 26, 0.82);
-      backdrop-filter: blur(64px) saturate(180%);
-      -webkit-backdrop-filter: blur(64px) saturate(180%);
-      border: 1px solid rgba(255,255,255,0.09);
+      background: var(--glass);
+      backdrop-filter: blur(72px) saturate(200%);
+      -webkit-backdrop-filter: blur(72px) saturate(200%);
+      border: 1px solid rgba(255,255,255,0.08);
       box-shadow:
-        0 48px 120px rgba(0,0,0,0.55),
-        0 12px 40px rgba(0,0,0,0.35),
-        inset 0 1px 0 rgba(255,255,255,0.11),
-        inset 0 -1px 0 rgba(0,0,0,0.25);
+        0 56px 140px rgba(0,0,0,0.60),
+        0 16px 48px  rgba(0,0,0,0.40),
+        inset 0  1px 0 rgba(255,255,255,0.10),
+        inset 0 -1px 0 rgba(0,0,0,0.22);
     }
 
-    /* ══════════════════════════════════
+    /* ════════════════════════════════════
        LOGIN
-    ══════════════════════════════════ */
+    ════════════════════════════════════ */
     .login-card {
-      width: min(430px, 100%);
-      padding: 64px 52px 56px;
-      border-radius: 36px; text-align: center;
-      animation: riseIn 0.85s cubic-bezier(0.16,1,0.3,1) both;
+      width:min(420px,100%);
+      padding:60px 48px 52px;
+      border-radius:36px; text-align:center;
+      animation: loginEnter 0.90s var(--smooth) both;
     }
+    @keyframes loginEnter {
+      0%   { opacity:0; transform:translateY(72px) scale(0.86); filter:blur(16px); }
+      35%  { filter:blur(3px); }
+      100% { opacity:1; transform:translateY(0)    scale(1);    filter:blur(0); }
+    }
+    @keyframes loginLeave {
+      0%   { opacity:1; transform:translateY(0)    scale(1);    filter:blur(0); }
+      100% { opacity:0; transform:translateY(44px) scale(0.90); filter:blur(10px); }
+    }
+    .login-card.leaving { animation: loginLeave 0.40s var(--snappy) forwards; }
 
-    @keyframes riseIn {
-      0%   { opacity:0; transform:translateY(64px) scale(0.88); filter:blur(8px); }
-      50%  { filter:blur(0); }
-      100% { opacity:1; transform:translateY(0) scale(1); filter:blur(0); }
-    }
-    @keyframes sinkOut {
-      0%   { opacity:1; transform:translateY(0) scale(1); filter:blur(0); }
-      100% { opacity:0; transform:translateY(40px) scale(0.92); filter:blur(6px); }
-    }
-    .login-card.leaving { animation: sinkOut 0.38s cubic-bezier(0.4,0,1,1) forwards; }
-
-    /* Logo image */
+    /* Logo */
     .logo-wrap { display:inline-block; margin-bottom:28px; }
     .logo-img {
-      width: 90px; height: 90px;
-      border-radius: 24px; object-fit: cover; display:block;
-      box-shadow: 0 12px 40px rgba(72,184,227,0.50), 0 0 0 2px rgba(255,255,255,0.10);
-      animation: floatY 5s ease-in-out infinite, logoPulse 3s ease-in-out infinite alternate;
+      width:88px; height:88px; border-radius:22px; object-fit:cover; display:block;
+      animation: logoFloat 6s ease-in-out infinite, logoGlow 3.5s ease-in-out infinite alternate;
     }
-    @keyframes floatY {
-      0%,100% { transform:translateY(0) rotate(-2deg); }
-      50%      { transform:translateY(-18px) rotate(2deg); }
+    @keyframes logoFloat {
+      0%,100% { transform:translateY(0)     rotate(-2deg); }
+      50%      { transform:translateY(-18px) rotate(2deg);  }
     }
-    @keyframes logoPulse {
-      from { box-shadow: 0 10px 30px rgba(72,184,227,0.40), 0 0 0 2px rgba(255,255,255,0.08); }
-      to   { box-shadow: 0 20px 56px rgba(72,184,227,0.74), 0 0 0 4px rgba(255,255,255,0.18); }
+    @keyframes logoGlow {
+      from { box-shadow:0 10px 30px rgba(72,184,227,0.42), 0 0 0 2px rgba(255,255,255,0.07); }
+      to   { box-shadow:0 22px 60px rgba(72,184,227,0.78), 0 0 0 5px rgba(255,255,255,0.16); }
     }
 
     .login-title {
       font-size:40px; font-weight:700; color:#fff; letter-spacing:-1.8px;
-      margin-bottom:10px; text-shadow: 0 4px 28px rgba(72,184,227,0.50);
+      margin-bottom:10px; text-shadow:0 4px 32px rgba(72,184,227,0.55);
+      animation: fadeSlideUp 0.7s var(--smooth) 0.12s both;
     }
     .login-sub {
-      font-size:14px; color:rgba(255,255,255,0.42); margin-bottom:48px; letter-spacing:0.2px;
+      font-size:14px; color:rgba(255,255,255,0.40); margin-bottom:46px; letter-spacing:0.2px;
+      animation: fadeSlideUp 0.7s var(--smooth) 0.20s both;
+    }
+    @keyframes fadeSlideUp {
+      from { opacity:0; transform:translateY(16px); }
+      to   { opacity:1; transform:translateY(0); }
     }
 
     .name-input {
-      width:100%; padding:16px 22px;
-      background:rgba(255,255,255,0.055); border:1.5px solid rgba(255,255,255,0.11);
-      border-radius:18px; color:#fff; font-size:16px; font-family:inherit; font-weight:500;
+      width:100%; padding:15px 22px;
+      background:rgba(255,255,255,0.05); border:1.5px solid rgba(255,255,255,0.10);
+      border-radius:16px; color:#fff; font-size:15.5px; font-family:inherit; font-weight:500;
       outline:none; text-align:center; letter-spacing:0.3px;
-      transition: border-color 0.25s, background 0.25s, box-shadow 0.25s;
-      margin-bottom:14px;
+      transition:border-color 0.25s, background 0.25s, box-shadow 0.25s;
+      margin-bottom:12px;
+      animation: fadeSlideUp 0.7s var(--smooth) 0.28s both;
     }
-    .name-input::placeholder { color:rgba(255,255,255,0.25); }
+    .name-input::placeholder { color:rgba(255,255,255,0.22); }
     .name-input:focus {
-      border-color: rgba(72,184,227,0.65); background:rgba(72,184,227,0.07);
-      box-shadow: 0 0 0 4px rgba(72,184,227,0.13), 0 0 0 1px rgba(72,184,227,0.28);
+      border-color:rgba(72,184,227,0.60); background:rgba(72,184,227,0.06);
+      box-shadow:0 0 0 4px rgba(72,184,227,0.12), 0 0 0 1px rgba(72,184,227,0.26);
     }
-    .name-input.shake { animation: shake 0.45s ease; border-color:rgba(255,80,80,0.5); }
+    .name-input.shake { animation:shake 0.45s ease; border-color:rgba(255,80,80,0.5); }
     @keyframes shake {
-      0%,100%{transform:translateX(0)} 20%{transform:translateX(-10px)}
-      40%{transform:translateX(10px)}  60%{transform:translateX(-6px)} 80%{transform:translateX(6px)}
+      0%,100%{transform:translateX(0)}
+      20%{transform:translateX(-10px)} 40%{transform:translateX(10px)}
+      60%{transform:translateX(-6px)}  80%{transform:translateX(6px)}
     }
 
     .join-btn {
-      width:100%; padding:16px;
-      background:linear-gradient(135deg,#48b8e3 0%,#28b1a6 100%);
-      border:none; border-radius:18px; color:#fff;
+      width:100%; padding:15.5px;
+      background:linear-gradient(135deg,var(--blue) 0%,var(--teal) 100%);
+      border:none; border-radius:16px; color:#fff;
       font-size:15.5px; font-weight:700; font-family:inherit; cursor:pointer; letter-spacing:0.3px;
       position:relative; overflow:hidden;
-      transition: transform 0.22s cubic-bezier(0.16,1,0.3,1), box-shadow 0.22s;
-      box-shadow: 0 6px 24px rgba(72,184,227,0.35);
+      transition:transform 0.24s var(--spring), box-shadow 0.24s;
+      box-shadow:0 6px 26px rgba(72,184,227,0.36);
+      animation: fadeSlideUp 0.7s var(--smooth) 0.34s both;
     }
     .join-btn::before {
-      content:''; position:absolute; inset:0;
-      background:linear-gradient(135deg,rgba(255,255,255,0.18) 0%,transparent 60%);
-      border-radius:inherit;
+      content:''; position:absolute; inset:0; border-radius:inherit;
+      background:linear-gradient(135deg,rgba(255,255,255,0.17) 0%,transparent 58%);
     }
     .join-btn::after {
       content:''; position:absolute; top:0; left:-100%; width:100%; height:100%;
       background:linear-gradient(90deg,transparent,rgba(255,255,255,0.24),transparent);
-      transition:left 0.58s cubic-bezier(0.4,0,0.2,1);
+      transition:left 0.60s var(--snappy);
     }
-    .join-btn:hover { transform:translateY(-3px) scale(1.01); box-shadow:0 18px 44px rgba(72,184,227,0.58); }
+    .join-btn:hover  { transform:translateY(-3px) scale(1.015); box-shadow:0 20px 48px rgba(72,184,227,0.62); }
     .join-btn:hover::after { left:100%; }
-    .join-btn:active { transform:translateY(0) scale(0.98); box-shadow:0 3px 10px rgba(72,184,227,0.3); }
+    .join-btn:active { transform:scale(0.97); box-shadow:0 3px 12px rgba(72,184,227,0.28); }
 
-    /* ══════════════════════════════════
+    /* ════════════════════════════════════
        CHAT CARD
-    ══════════════════════════════════ */
+    ════════════════════════════════════ */
     .chat-card {
       width:min(620px,100%); height:min(860px,calc(100vh - 32px));
       border-radius:30px; display:flex; flex-direction:column; overflow:hidden;
-      animation: popIn 0.60s cubic-bezier(0.16,1,0.3,1) both;
+      animation: chatEnter 0.65s var(--smooth) both;
     }
-    @keyframes popIn {
-      0%   { opacity:0; transform:scale(0.84) translateY(28px); filter:blur(6px); }
-      55%  { filter:blur(0); }
-      100% { opacity:1; transform:scale(1) translateY(0); filter:blur(0); }
+    @keyframes chatEnter {
+      0%   { opacity:0; transform:scale(0.86) translateY(32px); filter:blur(10px); }
+      45%  { filter:blur(0); }
+      100% { opacity:1; transform:scale(1)    translateY(0);    filter:blur(0); }
     }
 
     /* Header */
     .chat-header {
       flex-shrink:0; padding:16px 24px;
-      background:rgba(0,0,0,0.30); border-bottom:1px solid rgba(255,255,255,0.055);
+      background:rgba(0,0,0,0.28); border-bottom:1px solid rgba(255,255,255,0.05);
       display:flex; align-items:center; justify-content:space-between;
     }
     .header-left { display:flex; align-items:center; gap:11px; }
     .header-logo {
       width:30px; height:30px; border-radius:9px; object-fit:cover; flex-shrink:0;
-      box-shadow:0 2px 10px rgba(0,0,0,0.35);
+      box-shadow:0 2px 10px rgba(0,0,0,0.4);
     }
     .header-title { font-size:16px; font-weight:700; color:#fff; letter-spacing:-0.4px; }
 
     .online-badge {
       display:flex; align-items:center; gap:7px;
-      background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.08);
+      background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.07);
       padding:6px 14px; border-radius:20px;
     }
     .pulse-dot {
-      width:7px; height:7px; background:#4ade80; border-radius:50%; position:relative; flex-shrink:0;
+      width:7px; height:7px; background:#4ade80; border-radius:50%;
+      position:relative; flex-shrink:0;
     }
     .pulse-dot::after {
       content:''; position:absolute; inset:-4px; border-radius:50%;
-      border:1.5px solid #4ade80; animation:ripple 2.4s ease-out infinite;
+      border:1.5px solid #4ade80; animation:ripple 2.6s ease-out infinite;
     }
     @keyframes ripple {
-      0%   { opacity:0.75; transform:scale(1); }
-      100% { opacity:0;    transform:scale(3.2); }
+      0%   { opacity:0.80; transform:scale(1);   }
+      100% { opacity:0;    transform:scale(3.4); }
     }
-    .online-txt { font-size:12px; color:rgba(255,255,255,0.52); font-weight:500; }
+    .online-txt { font-size:12px; color:rgba(255,255,255,0.50); font-weight:500; }
 
-    /* Messages */
+    /* Messages area */
     .messages {
       flex:1; overflow-y:auto; overflow-x:hidden;
       padding:22px 22px 14px; display:flex; flex-direction:column; gap:0;
-      background:rgba(0,0,0,0.06);
+      background:rgba(0,0,0,0.05);
     }
     .messages::-webkit-scrollbar { width:3px; }
-    .messages::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.07); border-radius:3px; }
+    .messages::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.06); border-radius:3px; }
     .messages::-webkit-scrollbar-track { background:transparent; }
 
-    /* iMessage groups */
+    /* ── iMessage groups ─────────────────── */
     .msg-group {
       display:flex; align-items:flex-end; gap:10px; margin-bottom:14px;
-      animation: groupSlide 0.38s cubic-bezier(0.16,1,0.3,1) both;
+      animation: groupEnter 0.42s var(--smooth) both;
     }
-    @keyframes groupSlide {
-      from { opacity:0; transform:translateY(16px); }
+    @keyframes groupEnter {
+      from { opacity:0; transform:translateY(18px); }
       to   { opacity:1; transform:translateY(0); }
     }
     .msg-group.own   { flex-direction:row-reverse; }
@@ -199,13 +219,14 @@
       width:32px; height:32px; border-radius:50%;
       display:flex; align-items:center; justify-content:center;
       font-size:13px; font-weight:700; color:rgba(255,255,255,0.95);
-      flex-shrink:0; box-shadow:0 2px 10px rgba(0,0,0,0.4);
-      animation: avatarPop 0.45s cubic-bezier(0.16,1,0.3,1) both 0.06s;
+      flex-shrink:0; box-shadow:0 2px 10px rgba(0,0,0,0.45);
+      animation: avatarSpring 0.55s var(--spring) both 0.05s;
     }
-    @keyframes avatarPop {
-      0%   { opacity:0; transform:scale(0.3); }
-      65%  { transform:scale(1.14); }
-      100% { opacity:1; transform:scale(1); }
+    @keyframes avatarSpring {
+      0%   { opacity:0; transform:scale(0.2) rotate(-25deg); }
+      55%  { opacity:1; transform:scale(1.18) rotate(5deg); }
+      75%  { transform:scale(0.92) rotate(-2deg); }
+      100% { transform:scale(1) rotate(0deg); }
     }
     .msg-group.own .avatar { display:none; }
 
@@ -216,35 +237,36 @@
     .msg-group.other .bubble-stack { align-items:flex-start; }
 
     .sender-name {
-      font-size:11.5px; font-weight:600; color:rgba(255,255,255,0.40);
+      font-size:11.5px; font-weight:600; color:rgba(255,255,255,0.36);
       margin-bottom:5px; padding:0 5px;
     }
 
-    /* Bubbles */
+    /* ── Bubbles ─────────────────────────── */
     .bubble {
-      padding:10px 15px; font-size:15px; line-height:1.5; font-weight:500;
+      padding:10px 15px; font-size:15px; line-height:1.52; font-weight:500;
       color:#fff; word-break:break-word; position:relative; cursor:default;
-      transition: transform 0.18s cubic-bezier(0.16,1,0.3,1);
+      transition: transform 0.20s var(--spring), box-shadow 0.20s;
     }
-    .bubble:hover { transform:scale(1.02); }
+    .bubble:hover { transform:scale(1.025); }
 
-    /* Own — blue gradient, inner sheen */
+    /* Own — light blue glass */
     .msg-group.own .bubble {
-      background:linear-gradient(145deg,#3fbde6 0%,#2ab5ab 100%);
-      box-shadow: 0 3px 16px rgba(63,189,230,0.30);
+      background:var(--own-bg);
+      border:1px solid var(--own-border);
+      box-shadow:0 2px 16px rgba(72,184,227,0.16);
     }
     .msg-group.own .bubble::after {
       content:''; position:absolute; inset:0; border-radius:inherit;
-      background:linear-gradient(150deg,rgba(255,255,255,0.18) 0%,transparent 55%);
+      background:linear-gradient(150deg,rgba(255,255,255,0.14) 0%,transparent 52%);
       pointer-events:none;
     }
 
-    /* Other — higher contrast glass bubble */
+    /* Other — light gray glass */
     .msg-group.other .bubble {
-      background:rgba(255,255,255,0.16);
-      border:1px solid rgba(255,255,255,0.24);
-      text-shadow:0 1px 3px rgba(0,0,0,0.45);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.14), 0 2px 12px rgba(0,0,0,0.2);
+      background:var(--recv-bg);
+      border:1px solid var(--recv-border);
+      text-shadow:0 1px 3px rgba(0,0,0,0.55);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,0.10), 0 2px 14px rgba(0,0,0,0.18);
     }
 
     /* iMessage corner shapes */
@@ -258,83 +280,88 @@
     .msg-group.other .bubble[data-pos="middle"] { border-radius:5px 20px 20px 5px; }
     .msg-group.other .bubble[data-pos="last"]   { border-radius:5px 20px 20px 20px; }
 
-    /* Bubble spring animations — 4-stage spring */
+    /* ── Bubble spring entry ─────────────── */
     .msg-group.own .bubble.pop {
-      animation: popRight 0.50s cubic-bezier(0.16,1,0.3,1) both;
+      animation: springRight 0.55s var(--smooth) both;
     }
     .msg-group.other .bubble.pop {
-      animation: popLeft 0.50s cubic-bezier(0.16,1,0.3,1) both;
+      animation: springLeft 0.55s var(--smooth) both;
     }
-    @keyframes popRight {
-      0%   { opacity:0; transform:scale(0.58) translateX(32px); }
-      42%  { opacity:1; transform:scale(1.08) translateX(-5px); }
-      66%  { transform:scale(0.97) translateX(2px); }
-      84%  { transform:scale(1.02) translateX(-1px); }
-      100% { transform:scale(1)    translateX(0); }
+    @keyframes springRight {
+      0%   { opacity:0; transform:translateX(40px) scale(0.65); }
+      38%  { opacity:1; transform:translateX(-7px)  scale(1.07); }
+      58%  { transform:translateX(3px)  scale(0.98); }
+      76%  { transform:translateX(-2px) scale(1.02); }
+      90%  { transform:translateX(1px)  scale(0.99); }
+      100% { transform:translateX(0)    scale(1); }
     }
-    @keyframes popLeft {
-      0%   { opacity:0; transform:scale(0.58) translateX(-32px); }
-      42%  { opacity:1; transform:scale(1.08) translateX(5px); }
-      66%  { transform:scale(0.97) translateX(-2px); }
-      84%  { transform:scale(1.02) translateX(1px); }
-      100% { transform:scale(1)    translateX(0); }
+    @keyframes springLeft {
+      0%   { opacity:0; transform:translateX(-40px) scale(0.65); }
+      38%  { opacity:1; transform:translateX(7px)   scale(1.07); }
+      58%  { transform:translateX(-3px) scale(0.98); }
+      76%  { transform:translateX(2px)  scale(1.02); }
+      90%  { transform:translateX(-1px) scale(0.99); }
+      100% { transform:translateX(0)    scale(1); }
     }
 
     .ts {
-      font-size:11px; color:rgba(255,255,255,0.28); margin-top:5px; padding:0 5px;
+      font-size:11px; color:rgba(255,255,255,0.26);
+      margin-top:5px; padding:0 5px;
     }
 
     .msg-system {
-      text-align:center; font-size:11.5px; color:rgba(255,255,255,0.30);
+      text-align:center; font-size:11.5px; color:rgba(255,255,255,0.28);
       font-style:italic; margin:6px 0 14px;
-      animation: fadeUp 0.35s ease both;
+      animation: sysEnter 0.40s var(--smooth) both;
     }
-    @keyframes fadeUp {
-      from { opacity:0; transform:translateY(8px); }
-      to   { opacity:1; transform:translateY(0); }
+    @keyframes sysEnter {
+      from { opacity:0; transform:translateY(10px) scale(0.94); }
+      to   { opacity:1; transform:translateY(0)    scale(1); }
     }
 
-    /* Input area */
+    /* ── Input area ──────────────────────── */
     .input-area {
       flex-shrink:0; padding:14px 20px 20px;
-      background:rgba(0,0,0,0.22); border-top:1px solid rgba(255,255,255,0.05);
+      background:rgba(0,0,0,0.20); border-top:1px solid rgba(255,255,255,0.05);
       display:flex; align-items:center; gap:10px;
     }
     .msg-input {
       flex:1; padding:13px 18px;
-      background:rgba(255,255,255,0.065); border:1.5px solid rgba(255,255,255,0.09);
+      background:rgba(255,255,255,0.06); border:1.5px solid rgba(255,255,255,0.08);
       border-radius:24px; color:#fff; font-size:14.5px; font-family:inherit; font-weight:400;
-      outline:none; transition: border-color 0.22s, background 0.22s, box-shadow 0.22s;
+      outline:none; transition:border-color 0.22s, background 0.22s, box-shadow 0.22s;
     }
-    .msg-input::placeholder { color:rgba(255,255,255,0.26); }
+    .msg-input::placeholder { color:rgba(255,255,255,0.24); }
     .msg-input:focus {
-      border-color:rgba(72,184,227,0.55); background:rgba(72,184,227,0.06);
-      box-shadow: 0 0 0 3px rgba(72,184,227,0.10);
+      border-color:rgba(72,184,227,0.50); background:rgba(72,184,227,0.055);
+      box-shadow:0 0 0 3px rgba(72,184,227,0.10);
     }
 
     .send-btn {
       width:50px; height:50px; min-width:50px;
-      background:linear-gradient(135deg,#48b8e3,#28b1a6);
+      background:linear-gradient(135deg,var(--blue),var(--teal));
       border:none; border-radius:50%; color:#fff; cursor:pointer;
       display:flex; align-items:center; justify-content:center;
-      transition: transform 0.22s cubic-bezier(0.16,1,0.3,1), box-shadow 0.22s;
-      box-shadow:0 4px 18px rgba(72,184,227,0.38); position:relative; overflow:hidden;
+      box-shadow:0 4px 20px rgba(72,184,227,0.42);
+      position:relative; overflow:hidden;
+      transition:transform 0.22s var(--spring), box-shadow 0.22s;
     }
-    .send-btn svg { width:19px; height:19px; position:relative; z-index:1; }
     .send-btn::before {
       content:''; position:absolute; inset:0; border-radius:50%;
-      background:linear-gradient(145deg,rgba(255,255,255,0.20) 0%,transparent 60%);
+      background:linear-gradient(145deg,rgba(255,255,255,0.20) 0%,transparent 58%);
     }
-    .send-btn:hover { transform:scale(1.13); box-shadow:0 10px 32px rgba(72,184,227,0.62); }
-    .send-btn:active { transform:scale(0.88); }
-    .send-btn.fire { animation: btnFire 0.45s cubic-bezier(0.16,1,0.3,1); }
+    .send-btn svg { width:19px; height:19px; position:relative; z-index:1; }
+    .send-btn:hover { transform:scale(1.14); box-shadow:0 12px 36px rgba(72,184,227,0.66); }
+    .send-btn:active { transform:scale(0.86); }
+    .send-btn.fire { animation:btnFire 0.50s var(--smooth); }
     @keyframes btnFire {
-      0%   { transform:scale(1); }
-      22%  { transform:scale(0.76); }
-      50%  { transform:scale(1.24); }
-      72%  { transform:scale(0.94); }
-      88%  { transform:scale(1.05); }
-      100% { transform:scale(1); }
+      0%   { transform:scale(1);    }
+      18%  { transform:scale(0.70); }
+      46%  { transform:scale(1.30); }
+      66%  { transform:scale(0.91); }
+      82%  { transform:scale(1.07); }
+      93%  { transform:scale(0.97); }
+      100% { transform:scale(1);    }
     }
   </style>
 </head>
@@ -347,12 +374,12 @@
 <div id="login-screen" class="screen">
   <div class="glass login-card" id="login-card">
     <div class="logo-wrap">
-      <img class="logo-img" src="apple-touch-icon.png" alt="Glass Chat" />
+      <img class="logo-img" src="apple-touch-icon.png" alt="Glass Chat"/>
     </div>
     <h1 class="login-title">Glass Chat</h1>
     <p class="login-sub">A beautiful place to talk</p>
     <input class="name-input" id="name-input" type="text"
-      placeholder="Your name..." maxlength="20" autocomplete="off" spellcheck="false" />
+      placeholder="Your name..." maxlength="20" autocomplete="off" spellcheck="false"/>
     <button class="join-btn" id="join-btn">Join Chat</button>
   </div>
 </div>
@@ -362,7 +389,7 @@
   <div class="glass chat-card">
     <header class="chat-header">
       <div class="header-left">
-        <img class="header-logo" src="favicon-32.png" alt="" />
+        <img class="header-logo" src="favicon-32.png" alt=""/>
         <span class="header-title">Glass Chat</span>
       </div>
       <div class="online-badge">
@@ -373,7 +400,7 @@
     <div class="messages" id="messages"></div>
     <footer class="input-area">
       <input class="msg-input" id="msg-input" type="text"
-        placeholder="Message..." autocomplete="off" spellcheck="false" />
+        placeholder="Message..." autocomplete="off" spellcheck="false"/>
       <button class="send-btn" id="send-btn" title="Send">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
@@ -385,19 +412,18 @@
   </div>
 </div>
 
-<!-- Vanta -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/vanta@0.5.24/dist/vanta.fog.min.js"></script>
 <script>
   VANTA.FOG({
-    el: '#bg', mouseControls:true, touchControls:true, gyroControls:false,
+    el:'#bg', mouseControls:true, touchControls:true, gyroControls:false,
     minHeight:200, minWidth:200,
     highlightColor:0x48b8e3, midtoneColor:0xa3cfff, lowlightColor:0x28b1a6, baseColor:0xffffff
   });
 </script>
 <script src="/socket.io/socket.io.js"></script>
 <script>
-/* ── Particles ──────────────────────────── */
+/* ── Particles ─────────────────────────── */
 class Particles {
   constructor(c) {
     this.c=c; this.ctx=c.getContext('2d'); this.p=[]; this.raf=null;
@@ -406,14 +432,14 @@ class Particles {
   _r() { this.c.width=innerWidth; this.c.height=innerHeight; }
   burst(px,py,type) {
     const cfg = type==='send' ? {
-      n:22, vy:-2.4, spd:[3,8.5], sz:[2,6], dec:[0.015,0.026],
-      cols:['#48b8e3','#28b1a6','#ffffff','#a3cfff','#7ee8fa','#b8f0ff']
+      n:22, vy:-2.5, spd:[3.5,9], sz:[2,6], dec:[0.014,0.025],
+      cols:['#48b8e3','#28b1a6','#ffffff','#a3cfff','#7ee8fa','#c4f0ff']
     } : {
-      n:13, vy:-1.5, spd:[1.5,4.8], sz:[1.5,3.8], dec:[0.019,0.033],
-      cols:['#ffffff','#c8e8ff','#a3cfff','#e0f4ff','#d0f0ff']
+      n:14, vy:-1.6, spd:[1.5,5], sz:[1.5,4], dec:[0.018,0.032],
+      cols:['#ffffff','#c8e8ff','#a3cfff','#ddf0ff','#e8f5ff']
     };
     for(let i=0;i<cfg.n;i++){
-      const a=(Math.PI*2*i/cfg.n)+(Math.random()-0.5)*0.9;
+      const a=(Math.PI*2*i/cfg.n)+(Math.random()-0.5)*1.0;
       const s=cfg.spd[0]+Math.random()*(cfg.spd[1]-cfg.spd[0]);
       this.p.push({
         x:px,y:py,
@@ -428,47 +454,43 @@ class Particles {
   }
   _loop(){
     const tick=()=>{
-      const {ctx,c}=this;
-      ctx.clearRect(0,0,c.width,c.height);
+      const{ctx,c}=this; ctx.clearRect(0,0,c.width,c.height);
       this.p=this.p.filter(p=>p.a>0.01);
       for(const p of this.p){
-        p.x+=p.vx; p.y+=p.vy; p.vy+=0.14; p.vx*=0.97;
-        p.a-=p.dec; p.r*=0.975;
+        p.x+=p.vx; p.y+=p.vy; p.vy+=0.13; p.vx*=0.97;
+        p.a-=p.dec; p.r*=0.976;
         ctx.save(); ctx.globalAlpha=Math.max(0,p.a);
         ctx.fillStyle=p.col; ctx.beginPath();
         ctx.arc(p.x,p.y,Math.max(0.1,p.r),0,Math.PI*2);
         ctx.fill(); ctx.restore();
       }
-      if(this.p.length){ this.raf=requestAnimationFrame(tick); }
-      else { this.raf=null; ctx.clearRect(0,0,c.width,c.height); }
+      if(this.p.length){this.raf=requestAnimationFrame(tick);}
+      else{this.raf=null;ctx.clearRect(0,0,c.width,c.height);}
     };
     this.raf=requestAnimationFrame(tick);
   }
 }
 const ps=new Particles(document.getElementById('pcanvas'));
 
-/* ── State ──────────────────────────────── */
+/* ── State ─────────────────────────────── */
 const socket=io();
-let myName='', lastGroupEl=null, lastGroupUser=null, lastGroupTime=0;
+let myName='',lastGroupEl=null,lastGroupUser=null,lastGroupTime=0;
 const GROUP_GAP=60000;
 const AV_COLORS=['#48b8e3','#28b1a6','#7c66dc','#e87d4a','#4ade80','#f472b6','#fb923c'];
 const userColor=n=>{let h=0;for(const c of n)h=(h*31+c.charCodeAt(0))&0xffff;return AV_COLORS[h%AV_COLORS.length];};
 const fmtTime=ts=>new Date(ts||Date.now()).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
 function updatePositions(stack){
   const bs=stack.querySelectorAll('.bubble');
-  bs.forEach((b,i)=>{
-    b.dataset.pos=bs.length===1?'single':i===0?'first':i===bs.length-1?'last':'middle';
-  });
+  bs.forEach((b,i)=>{b.dataset.pos=bs.length===1?'single':i===0?'first':i===bs.length-1?'last':'middle';});
 }
 
 /* Pre-fill saved name */
 const saved=localStorage.getItem('gc_name');
-if(saved) document.getElementById('name-input').value=saved;
+if(saved)document.getElementById('name-input').value=saved;
 
-/* ── Login ──────────────────────────────── */
+/* ── Login ─────────────────────────────── */
 function joinChat(){
-  const inp=document.getElementById('name-input');
-  const name=inp.value.trim();
+  const inp=document.getElementById('name-input'), name=inp.value.trim();
   if(!name){
     inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
     setTimeout(()=>inp.classList.remove('shake'),500); return;
@@ -480,18 +502,17 @@ function joinChat(){
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('chat-screen').classList.remove('hidden');
     document.getElementById('msg-input').focus();
-  },380);
+  },400);
 }
 document.getElementById('join-btn').addEventListener('click',joinChat);
-document.getElementById('name-input').addEventListener('keydown',e=>{ if(e.key==='Enter')joinChat(); });
+document.getElementById('name-input').addEventListener('keydown',e=>{if(e.key==='Enter')joinChat();});
 
-/* ── Add message ────────────────────────── */
+/* ── Messages ──────────────────────────── */
 function addMessage(data,isOwn,fromHistory){
   const box=document.getElementById('messages');
   const ts=data.ts||Date.now(), user=data.user;
-  const same=lastGroupEl && lastGroupUser===user && (ts-lastGroupTime)<GROUP_GAP;
+  const same=lastGroupEl&&lastGroupUser===user&&(ts-lastGroupTime)<GROUP_GAP;
   let group,stack;
-
   if(same){
     group=lastGroupEl; stack=group.querySelector('.bubble-stack');
     const oldTs=stack.querySelector('.ts'); if(oldTs)oldTs.remove();
@@ -506,20 +527,16 @@ function addMessage(data,isOwn,fromHistory){
     }
     stack=document.createElement('div'); stack.className='bubble-stack';
     if(!isOwn){
-      const nm=document.createElement('div'); nm.className='sender-name'; nm.textContent=user;
-      stack.appendChild(nm);
+      const nm=document.createElement('div'); nm.className='sender-name';
+      nm.textContent=user; stack.appendChild(nm);
     }
     group.appendChild(stack); box.appendChild(group);
   }
-
   const bubble=document.createElement('div');
   bubble.className='bubble'+(fromHistory?'':' pop');
-  bubble.textContent=data.text;
-  stack.appendChild(bubble);
-
+  bubble.textContent=data.text; stack.appendChild(bubble);
   const tsEl=document.createElement('div'); tsEl.className='ts';
   tsEl.textContent=fmtTime(ts); stack.appendChild(tsEl);
-
   updatePositions(stack);
   lastGroupEl=group; lastGroupUser=user; lastGroupTime=ts;
   box.scrollTop=box.scrollHeight;
@@ -527,25 +544,25 @@ function addMessage(data,isOwn,fromHistory){
 
 function addSystem(text){
   const box=document.getElementById('messages');
-  const div=document.createElement('div'); div.className='msg-system'; div.textContent=text;
-  box.appendChild(div); box.scrollTop=box.scrollHeight;
-  lastGroupEl=null; lastGroupUser=null;
+  const div=document.createElement('div'); div.className='msg-system';
+  div.textContent=text; box.appendChild(div);
+  box.scrollTop=box.scrollHeight; lastGroupEl=null; lastGroupUser=null;
 }
 
-/* ── Send ───────────────────────────────── */
+/* ── Send ──────────────────────────────── */
 function sendMsg(){
-  const inp=document.getElementById('msg-input'); const text=inp.value.trim();
+  const inp=document.getElementById('msg-input'), text=inp.value.trim();
   if(!text||!myName)return;
   socket.emit('message',{user:myName,text}); inp.value='';
   const btn=document.getElementById('send-btn');
-  const rect=btn.getBoundingClientRect();
-  ps.burst(rect.left+rect.width/2,rect.top+rect.height/2,'send');
+  const r=btn.getBoundingClientRect();
+  ps.burst(r.left+r.width/2, r.top+r.height/2,'send');
   btn.classList.remove('fire'); void btn.offsetWidth; btn.classList.add('fire');
 }
 document.getElementById('send-btn').addEventListener('click',sendMsg);
-document.getElementById('msg-input').addEventListener('keydown',e=>{ if(e.key==='Enter')sendMsg(); });
+document.getElementById('msg-input').addEventListener('keydown',e=>{if(e.key==='Enter')sendMsg();});
 
-/* ── Socket events ──────────────────────── */
+/* ── Socket ────────────────────────────── */
 socket.on('history',msgs=>{
   const box=document.getElementById('messages'); box.innerHTML='';
   lastGroupEl=null; lastGroupUser=null;
@@ -555,12 +572,12 @@ socket.on('message',data=>{
   const isOwn=data.socketId===socket.id;
   addMessage(data,isOwn,false);
   if(!isOwn){
-    const rect=document.getElementById('messages').getBoundingClientRect();
-    ps.burst(rect.left+70,rect.bottom-85,'recv');
+    const r=document.getElementById('messages').getBoundingClientRect();
+    ps.burst(r.left+70,r.bottom-85,'recv');
   }
 });
 socket.on('system',text=>addSystem(text));
-socket.on('user-count',n=>{ document.getElementById('online-count').textContent=`${n} online`; });
+socket.on('user-count',n=>{document.getElementById('online-count').textContent=`${n} online`;});
 </script>
 </body>
 </html>
