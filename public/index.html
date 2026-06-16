@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,136 +7,120 @@
   <link rel="icon" type="image/x-icon" href="favicon.ico" />
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
-
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
-    * { box-sizing: border-box; }
-    body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
-
-    #bg {
-      position: fixed;
-      width: 100vw;
-      height: 100vh;
-      z-index: 0;
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', -apple-system, sans-serif; overflow: hidden; min-height: 100vh; background: #071020; }
+    #bg { position: fixed; inset: 0; z-index: 0; }
+    .screen { position: fixed; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: center; }
+    .screen.hidden { display: none; }
+    .glass {
+      background: rgba(255,255,255,0.07);
+      backdrop-filter: blur(48px) saturate(160%);
+      -webkit-backdrop-filter: blur(48px) saturate(160%);
+      border: 1px solid rgba(255,255,255,0.16);
+      box-shadow: 0 32px 80px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -1px 0 rgba(0,0,0,0.08);
     }
 
-    .app {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 450px;
-      height: 650px;
-      z-index: 1;
+    /* LOGIN */
+    #login-screen .card { width: 390px; padding: 56px 44px 48px; border-radius: 32px; text-align: center; animation: riseIn 0.7s cubic-bezier(0.16,1,0.3,1) both; }
+    @keyframes riseIn { from { opacity:0; transform:translateY(40px) scale(0.94); } to { opacity:1; transform:translateY(0) scale(1); } }
+    @keyframes sinkOut { to { opacity:0; transform:translateY(28px) scale(0.96); } }
+    .card.leaving { animation: sinkOut 0.34s cubic-bezier(0.4,0,1,1) forwards; }
+    .logo-wrap { display:inline-block; margin-bottom:20px; animation:float 4s ease-in-out infinite; }
+    .logo-emoji { font-size:60px; display:block; filter:drop-shadow(0 8px 20px rgba(72,184,227,0.55)); }
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
+    .login-title { font-size:36px; font-weight:700; color:#fff; letter-spacing:-1px; margin-bottom:8px; text-shadow:0 2px 20px rgba(72,184,227,0.4); }
+    .login-sub { font-size:14px; color:rgba(255,255,255,0.48); margin-bottom:40px; }
+    .name-input { width:100%; padding:15px 20px; background:rgba(255,255,255,0.07); border:1.5px solid rgba(255,255,255,0.16); border-radius:16px; color:#fff; font-size:15px; font-family:inherit; outline:none; text-align:center; letter-spacing:0.3px; transition:border-color 0.22s,background 0.22s,box-shadow 0.22s; margin-bottom:14px; }
+    .name-input::placeholder { color:rgba(255,255,255,0.32); }
+    .name-input:focus { border-color:#48b8e3; background:rgba(72,184,227,0.08); box-shadow:0 0 0 4px rgba(72,184,227,0.15); }
+    .name-input.shake { animation:shake 0.45s ease; border-color:rgba(255,100,100,0.55); }
+    @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-10px)} 40%{transform:translateX(10px)} 60%{transform:translateX(-6px)} 80%{transform:translateX(6px)} }
+    .join-btn { width:100%; padding:15px; background:linear-gradient(135deg,#48b8e3 0%,#28b1a6 100%); border:none; border-radius:16px; color:#fff; font-size:15px; font-weight:600; font-family:inherit; cursor:pointer; letter-spacing:0.2px; position:relative; overflow:hidden; transition:transform 0.18s,box-shadow 0.18s; }
+    .join-btn::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent); transform:translateX(-100%); transition:transform 0.5s; }
+    .join-btn:hover { transform:translateY(-2px); box-shadow:0 12px 32px rgba(72,184,227,0.5); }
+    .join-btn:hover::after { transform:translateX(100%); }
+    .join-btn:active { transform:translateY(0); box-shadow:none; }
 
-      background: rgba(255, 255, 255, 0.08);
-      backdrop-filter: blur(25px);
-      -webkit-backdrop-filter: blur(25px);
-      border-radius: 24px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    .header {
-      padding: 16px 20px;
-      color: white;
-      font-size: 18px;
-      font-weight: 600;
-      letter-spacing: 0.5px;
-      background: rgba(0, 0, 0, 0.25);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    .messages {
-      flex: 1;
-      padding: 14px;
-      overflow-y: auto;
-      color: white;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .messages::-webkit-scrollbar { width: 4px; }
-    .messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
-
-    .msg {
-      padding: 10px 14px;
-      border-radius: 14px;
-      background: rgba(255, 255, 255, 0.15);
-      font-size: 14px;
-      line-height: 1.4;
-      word-break: break-word;
-    }
-
-    .msg .sender {
-      font-size: 11px;
-      opacity: 0.65;
-      margin-bottom: 3px;
-    }
-
-    .input-row {
-      display: flex;
-      padding: 12px;
-      gap: 8px;
-      background: rgba(0, 0, 0, 0.25);
-      border-top: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    input {
-      flex: 1;
-      padding: 10px 14px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 12px;
-      background: rgba(255, 255, 255, 0.12);
-      color: white;
-      font-size: 14px;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-
-    input::placeholder { color: rgba(255,255,255,0.45); }
-    input:focus { border-color: #48b8e3; }
-
-    button {
-      background: #48b8e3;
-      border: none;
-      border-radius: 12px;
-      color: white;
-      padding: 10px 18px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-
-    button:hover { background: #2da8d8; }
+    /* CHAT */
+    #chat-screen .card { width:470px; height:690px; border-radius:28px; display:flex; flex-direction:column; overflow:hidden; animation:popIn 0.48s cubic-bezier(0.16,1,0.3,1) both; }
+    @keyframes popIn { from{opacity:0;transform:scale(0.93)} to{opacity:1;transform:scale(1)} }
+    .chat-header { flex-shrink:0; padding:18px 22px; background:rgba(0,0,0,0.22); border-bottom:1px solid rgba(255,255,255,0.07); display:flex; align-items:center; justify-content:space-between; }
+    .chat-brand { font-size:16px; font-weight:700; color:#fff; letter-spacing:-0.3px; }
+    .online-badge { display:flex; align-items:center; gap:7px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); padding:5px 13px; border-radius:20px; }
+    .pulse-dot { width:7px; height:7px; background:#4ade80; border-radius:50%; position:relative; flex-shrink:0; }
+    .pulse-dot::after { content:''; position:absolute; inset:-3px; border-radius:50%; border:2px solid #4ade80; animation:ripple 2s ease-out infinite; }
+    @keyframes ripple { 0%{opacity:0.7;transform:scale(1)} 100%{opacity:0;transform:scale(2.5)} }
+    .online-txt { font-size:12px; color:rgba(255,255,255,0.6); font-weight:500; }
+    .messages { flex:1; overflow-y:auto; padding:20px 18px 10px; display:flex; flex-direction:column; gap:2px; }
+    .messages::-webkit-scrollbar { width:3px; }
+    .messages::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.1); border-radius:3px; }
+    .msg-group { display:flex; flex-direction:column; margin-bottom:8px; }
+    .msg-group.own   { align-items:flex-end;   animation:slideRight 0.28s cubic-bezier(0.16,1,0.3,1) both; }
+    .msg-group.other { align-items:flex-start; animation:slideLeft  0.28s cubic-bezier(0.16,1,0.3,1) both; }
+    @keyframes slideRight { from{opacity:0;transform:translateX(18px)} to{opacity:1;transform:translateX(0)} }
+    @keyframes slideLeft  { from{opacity:0;transform:translateX(-18px)} to{opacity:1;transform:translateX(0)} }
+    .msg-meta { font-size:11px; color:rgba(255,255,255,0.35); margin-bottom:5px; padding:0 6px; font-weight:500; }
+    .msg-bubble { max-width:74%; padding:10px 15px; border-radius:18px; font-size:14px; line-height:1.55; color:#fff; word-break:break-word; }
+    .msg-group.own   .msg-bubble { background:rgba(72,184,227,0.28); border:1px solid rgba(72,184,227,0.3); border-bottom-right-radius:5px; }
+    .msg-group.other .msg-bubble { background:rgba(255,255,255,0.10); border:1px solid rgba(255,255,255,0.12); border-bottom-left-radius:5px; }
+    .msg-system { text-align:center; font-size:11.5px; color:rgba(255,255,255,0.32); font-style:italic; margin:4px 0 10px; animation:fadeUp 0.3s ease both; }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+    .input-area { flex-shrink:0; padding:14px 16px; background:rgba(0,0,0,0.18); border-top:1px solid rgba(255,255,255,0.06); display:flex; align-items:center; gap:10px; }
+    .msg-input { flex:1; padding:12px 16px; background:rgba(255,255,255,0.07); border:1.5px solid rgba(255,255,255,0.12); border-radius:14px; color:#fff; font-size:14px; font-family:inherit; outline:none; transition:border-color 0.2s,background 0.2s,box-shadow 0.2s; }
+    .msg-input::placeholder { color:rgba(255,255,255,0.3); }
+    .msg-input:focus { border-color:#48b8e3; background:rgba(72,184,227,0.07); box-shadow:0 0 0 3px rgba(72,184,227,0.12); }
+    .send-btn { width:46px; height:46px; min-width:46px; background:linear-gradient(135deg,#48b8e3,#28b1a6); border:none; border-radius:14px; color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:transform 0.15s,box-shadow 0.15s; }
+    .send-btn svg { width:18px; height:18px; }
+    .send-btn:hover { transform:scale(1.09); box-shadow:0 8px 22px rgba(72,184,227,0.5); }
+    .send-btn:active { transform:scale(0.92); }
   </style>
 </head>
-
 <body>
 
 <div id="bg"></div>
 
-<div class="app">
-  <div class="header">💬 Glass Chat</div>
-  <div class="messages" id="messages"></div>
-  <div class="input-row">
-    <input id="text" placeholder="Message..." onkeydown="if(event.key==='Enter') send()" />
-    <button onclick="send()">Send</button>
+<!-- LOGIN -->
+<div id="login-screen" class="screen">
+  <div class="card glass" id="login-card">
+    <div class="logo-wrap"><span class="logo-emoji">💬</span></div>
+    <h1 class="login-title">Glass Chat</h1>
+    <p class="login-sub">A beautiful place to talk</p>
+    <input class="name-input" id="name-input" type="text" placeholder="Your name..." maxlength="20" autocomplete="off" spellcheck="false" />
+    <button class="join-btn" id="join-btn">Join Chat</button>
   </div>
 </div>
 
-<!-- Vanta Fog — local files (place both in public/) -->
-<script src="three.r134.min.js"></script>
-<script src="vanta.fog.min.js"></script>
+<!-- CHAT -->
+<div id="chat-screen" class="screen hidden">
+  <div class="card glass">
+    <div class="chat-header">
+      <span class="chat-brand">💬 Glass Chat</span>
+      <div class="online-badge">
+        <span class="pulse-dot"></span>
+        <span class="online-txt" id="online-count">0 online</span>
+      </div>
+    </div>
+    <div class="messages" id="messages"></div>
+    <div class="input-area">
+      <input class="msg-input" id="msg-input" placeholder="Message..." autocomplete="off" spellcheck="false" />
+      <button class="send-btn" id="send-btn" title="Send">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"></line>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vanta@0.5.24/dist/vanta.fog.min.js"></script>
 <script>
   VANTA.FOG({
-    el: "#bg",
+    el: '#bg',
     mouseControls: true,
     touchControls: true,
     gyroControls: false,
@@ -149,33 +133,75 @@
   });
 </script>
 
-<!-- Socket.io — relative URL works whether local or on Render -->
 <script src="/socket.io/socket.io.js"></script>
-
 <script>
   const socket = io();
-  const box = document.getElementById("messages");
-  const user = "User" + Math.floor(Math.random() * 9999);
+  let myName = '';
 
-  function add(sender, text) {
-    const div = document.createElement("div");
-    div.className = "msg";
-    div.innerHTML = `<div class="sender">${sender}</div>${text}`;
+  function joinChat() {
+    const input = document.getElementById('name-input');
+    const name = input.value.trim();
+    if (!name) {
+      input.classList.remove('shake');
+      void input.offsetWidth;
+      input.classList.add('shake');
+      setTimeout(() => input.classList.remove('shake'), 500);
+      return;
+    }
+    myName = name;
+    socket.emit('join', name);
+    document.getElementById('login-card').classList.add('leaving');
+    setTimeout(() => {
+      document.getElementById('login-screen').classList.add('hidden');
+      document.getElementById('chat-screen').classList.remove('hidden');
+      document.getElementById('msg-input').focus();
+    }, 340);
+  }
+
+  document.getElementById('join-btn').addEventListener('click', joinChat);
+  document.getElementById('name-input').addEventListener('keydown', e => { if (e.key === 'Enter') joinChat(); });
+
+  function now() { return new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }); }
+
+  function addMessage(data, isOwn) {
+    const box = document.getElementById('messages');
+    const group = document.createElement('div');
+    group.className = `msg-group ${isOwn ? 'own' : 'other'}`;
+    const meta = document.createElement('div');
+    meta.className = 'msg-meta';
+    meta.textContent = isOwn ? `You · ${now()}` : `${data.user} · ${now()}`;
+    const bubble = document.createElement('div');
+    bubble.className = 'msg-bubble';
+    bubble.textContent = data.text;
+    group.appendChild(meta);
+    group.appendChild(bubble);
+    box.appendChild(group);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function addSystem(text) {
+    const box = document.getElementById('messages');
+    const div = document.createElement('div');
+    div.className = 'msg-system';
+    div.textContent = text;
     box.appendChild(div);
     box.scrollTop = box.scrollHeight;
   }
 
-  function send() {
-    const input = document.getElementById("text");
-    if (!input.value.trim()) return;
-    socket.emit("message", { user, text: input.value.trim() });
-    input.value = "";
+  function sendMsg() {
+    const input = document.getElementById('msg-input');
+    const text = input.value.trim();
+    if (!text || !myName) return;
+    socket.emit('message', { user: myName, text });
+    input.value = '';
   }
 
-  socket.on("message", (data) => {
-    add(data.user, data.text);
-  });
-</script>
+  document.getElementById('send-btn').addEventListener('click', sendMsg);
+  document.getElementById('msg-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendMsg(); });
 
+  socket.on('message', data => addMessage(data, data.socketId === socket.id));
+  socket.on('system',  text  => addSystem(text));
+  socket.on('user-count', n  => { document.getElementById('online-count').textContent = `${n} online`; });
+</script>
 </body>
 </html>
