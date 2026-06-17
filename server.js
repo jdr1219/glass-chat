@@ -10,7 +10,7 @@ const io     = new Server(server, { cors: { origin: "*" } });
 app.use(express.static(path.join(__dirname, "public")));
 app.get("/health", (req, res) => res.send("ok"));
 
-const users   = {};
+const users   = {};   // socket.id -> username
 const history = [];
 const MAX_HISTORY = 100;
 
@@ -20,13 +20,25 @@ io.on("connection", socket => {
     socket.emit("history", history);
     socket.broadcast.emit("system", `${username} joined`);
     io.emit("user-count", Object.keys(users).length);
+
+    // Tell the new arrival's messages have now been "seen" by everyone already present
+    io.emit("presence-seen", { reader: username });
   });
 
   socket.on("message", data => {
-    const msg = { ...data, socketId: socket.id, ts: Date.now() };
+    const msg = { ...data, socketId: socket.id, id: `${Date.now()}_${Math.random().toString(36).slice(2,8)}`, ts: Date.now(), seenBy: [] };
     history.push(msg);
     if (history.length > MAX_HISTORY) history.shift();
     io.emit("message", msg);
+  });
+
+  // Read receipt: a client tells us it has rendered/seen a message
+  socket.on("seen", ({ id, reader }) => {
+    const msg = history.find(m => m.id === id);
+    if (msg && !msg.seenBy.includes(reader)) {
+      msg.seenBy.push(reader);
+      io.emit("seen-update", { id, reader });
+    }
   });
 
   socket.on("disconnect", () => {
