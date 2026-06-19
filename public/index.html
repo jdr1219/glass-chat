@@ -2,229 +2,99 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/>
 <title>Glass Chat</title>
 <link rel="icon" type="image/x-icon" href="favicon.ico"/>
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png"/>
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
-<style>
-:root{
-  --blue:#2f9fd8; --teal:#22a89c; --ink:#15243a; --ink-soft:#48607a;
-  --glass-bg: rgba(255,255,255,0.10);
-  --glass-border: rgba(255,255,255,0.40);
-  --own-bg: rgba(47,159,216,0.30);
-  --own-border: rgba(47,159,216,0.42);
-  --recv-bg: rgba(255,255,255,0.62);
-  --recv-border: rgba(255,255,255,0.55);
-  --ease: cubic-bezier(.22,1,.36,1);
-  --ease-in: cubic-bezier(.4,0,1,1);
-}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden;min-height:100vh;background:#9fd8f0;}
-#bg{position:fixed;inset:0;z-index:0;}
-#pcanvas{position:fixed;inset:0;z-index:999;pointer-events:none;}
-.screen{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;padding:16px;}
-.screen.hidden{display:none;}
-
-/* True clear glass — blur only, minimal tint */
-.glass{
-  background:var(--glass-bg);
-  backdrop-filter:blur(34px) saturate(140%);
-  -webkit-backdrop-filter:blur(34px) saturate(140%);
-  border:1px solid var(--glass-border);
-  box-shadow:0 30px 70px rgba(15,40,60,.16),0 6px 18px rgba(15,40,60,.08),
-    inset 0 1px 0 rgba(255,255,255,.55);
-}
-
-/* ══ LOGIN ══ */
-.login-card{width:min(400px,100%);padding:54px 44px 46px;border-radius:28px;text-align:center;
-  will-change:transform,opacity,filter;
-  animation:cardIn .55s var(--ease) both;}
-@keyframes cardIn{
-  from{opacity:0;transform:translateY(28px) scale(.96);filter:blur(6px);}
-  to{opacity:1;transform:translateY(0) scale(1);filter:blur(0);}
-}
-@keyframes cardOut{
-  from{opacity:1;transform:translateY(0) scale(1);filter:blur(0);}
-  to{opacity:0;transform:translateY(-12px) scale(.97);filter:blur(4px);}
-}
-.login-card.leaving{animation:cardOut .28s var(--ease-in) forwards;}
-
-.logo-wrap{display:inline-block;margin-bottom:22px;}
-.logo-img{width:76px;height:76px;border-radius:20px;object-fit:cover;display:block;
-  box-shadow:0 12px 30px rgba(47,159,216,.38),0 0 0 1px rgba(255,255,255,.4);
-  animation:logoIn .6s var(--ease) .05s both;}
-@keyframes logoIn{from{opacity:0;transform:scale(.7) translateY(8px);}to{opacity:1;transform:scale(1) translateY(0);}}
-
-.login-title{font-size:32px;font-weight:800;color:var(--ink);letter-spacing:-1.1px;margin-bottom:8px;
-  animation:fadeUp .5s var(--ease) .10s both;}
-.login-sub{font-size:13.5px;color:var(--ink-soft);margin-bottom:38px;letter-spacing:.1px;
-  animation:fadeUp .5s var(--ease) .16s both;}
-@keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
-
-.name-input{width:100%;padding:14px 20px;background:rgba(255,255,255,0.40);border:1.5px solid rgba(255,255,255,0.55);
-  border-radius:14px;color:var(--ink);font-size:15px;font-family:inherit;font-weight:600;outline:none;
-  text-align:center;letter-spacing:.2px;
-  transition:border-color .2s var(--ease),background .2s var(--ease),box-shadow .2s var(--ease);
-  margin-bottom:12px;animation:fadeUp .5s var(--ease) .22s both;}
-.name-input::placeholder{color:rgba(21,36,58,0.38);font-weight:500;}
-.name-input:focus{border-color:rgba(47,159,216,.7);background:rgba(255,255,255,0.55);
-  box-shadow:0 0 0 4px rgba(47,159,216,.14);}
-.name-input.shake{animation:shake .4s var(--ease);border-color:rgba(224,90,90,.55);}
-@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}
-  50%{transform:translateX(8px)}75%{transform:translateX(-4px)}}
-
-.join-btn{width:100%;padding:14.5px;background:linear-gradient(135deg,var(--blue) 0%,var(--teal) 100%);
-  border:none;border-radius:14px;color:#fff;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;
-  letter-spacing:.2px;position:relative;overflow:hidden;
-  transition:transform .18s var(--ease),box-shadow .18s var(--ease);
-  box-shadow:0 8px 22px rgba(47,159,216,.32);animation:fadeUp .5s var(--ease) .28s both;}
-.join-btn:hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(47,159,216,.46);}
-.join-btn:active{transform:translateY(0) scale(.98);box-shadow:0 4px 14px rgba(47,159,216,.30);}
-
-/* ══ CHAT CARD ══ */
-.chat-card{width:min(600px,100%);height:min(820px,calc(100vh - 32px));border-radius:26px;display:flex;
-  flex-direction:column;overflow:hidden;will-change:transform,opacity,filter;
-  animation:cardIn .5s var(--ease) both;}
-
-.chat-header{flex-shrink:0;padding:15px 22px;background:rgba(255,255,255,0.14);
-  border-bottom:1px solid rgba(255,255,255,0.30);display:flex;align-items:center;justify-content:space-between;}
-.header-left{display:flex;align-items:center;gap:10px;}
-.header-logo{width:28px;height:28px;border-radius:8px;object-fit:cover;flex-shrink:0;
-  box-shadow:0 2px 8px rgba(15,40,60,.20);}
-.header-title{font-size:15.5px;font-weight:700;color:var(--ink);letter-spacing:-.3px;}
-.online-badge{display:flex;align-items:center;gap:7px;background:rgba(255,255,255,0.22);
-  border:1px solid rgba(255,255,255,0.35);padding:5px 13px;border-radius:18px;}
-.pulse-dot{width:6.5px;height:6.5px;background:#34c97a;border-radius:50%;position:relative;flex-shrink:0;}
-.pulse-dot::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:1.5px solid #34c97a;
-  animation:ripple 2.8s ease-out infinite;}
-@keyframes ripple{0%{opacity:.7;transform:scale(1)}100%{opacity:0;transform:scale(2.8)}}
-.online-txt{font-size:11.5px;color:var(--ink-soft);font-weight:600;}
-
-.messages{flex:1;overflow-y:auto;overflow-x:hidden;padding:20px 20px 12px;display:flex;flex-direction:column;gap:0;}
-.messages::-webkit-scrollbar{width:3px;}
-.messages::-webkit-scrollbar-thumb{background:rgba(21,36,58,0.16);border-radius:3px;}
-.messages::-webkit-scrollbar-track{background:transparent;}
-
-.msg-group{display:flex;align-items:flex-end;gap:9px;margin-bottom:12px;
-  will-change:transform,opacity;animation:groupIn .38s var(--ease) both;}
-@keyframes groupIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
-.msg-group.own{flex-direction:row-reverse;}
-.msg-group.other{flex-direction:row;}
-.msg-group.tight{margin-bottom:3px;animation:none;}
-
-.avatar{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-  font-size:12.5px;font-weight:700;color:#fff;flex-shrink:0;box-shadow:0 2px 8px rgba(15,40,60,.25);}
-.msg-group.own .avatar{display:none;}
-
-.bubble-stack{display:flex;flex-direction:column;gap:3px;max-width:75%;}
-.msg-group.own .bubble-stack{align-items:flex-end;}
-.msg-group.other .bubble-stack{align-items:flex-start;}
-.sender-name{font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:4px;padding:0 5px;}
-
-.bubble{padding:9px 14px;font-size:14.5px;line-height:1.48;font-weight:500;color:var(--ink);
-  word-break:break-word;position:relative;cursor:default;
-  transition:transform .15s var(--ease);
-  will-change:transform,opacity;}
-
-.msg-group.own .bubble{background:var(--own-bg);border:1px solid var(--own-border);
-  box-shadow:0 2px 10px rgba(47,159,216,.18);}
-.msg-group.other .bubble{background:var(--recv-bg);border:1px solid var(--recv-border);
-  box-shadow:0 2px 10px rgba(15,40,60,.08);}
-
-.msg-group.own .bubble[data-pos="single"]{border-radius:18px 18px 4px 18px;}
-.msg-group.own .bubble[data-pos="first"]{border-radius:18px 18px 4px 18px;}
-.msg-group.own .bubble[data-pos="middle"]{border-radius:18px 4px 4px 18px;}
-.msg-group.own .bubble[data-pos="last"]{border-radius:18px 4px 18px 18px;}
-.msg-group.other .bubble[data-pos="single"]{border-radius:18px 18px 18px 4px;}
-.msg-group.other .bubble[data-pos="first"]{border-radius:18px 18px 18px 4px;}
-.msg-group.other .bubble[data-pos="middle"]{border-radius:4px 18px 18px 4px;}
-.msg-group.other .bubble[data-pos="last"]{border-radius:4px 18px 18px 18px;}
-
-/* Single clean spring — one overshoot, then settle. No multi-bounce. */
-.msg-group.own .bubble.pop{animation:popRight .32s var(--ease) both;}
-.msg-group.other .bubble.pop{animation:popLeft .32s var(--ease) both;}
-@keyframes popRight{from{opacity:0;transform:translateX(18px) scale(.88);}to{opacity:1;transform:translateX(0) scale(1);}}
-@keyframes popLeft{from{opacity:0;transform:translateX(-18px) scale(.88);}to{opacity:1;transform:translateX(0) scale(1);}}
-
-.ts{font-size:10.5px;color:rgba(21,36,58,.42);margin-top:4px;padding:0 5px;display:flex;align-items:center;gap:5px;}
-.receipt{font-size:10.5px;color:rgba(47,159,216,.75);font-weight:600;opacity:0;transform:translateY(2px);
-  transition:opacity .25s var(--ease),transform .25s var(--ease);}
-.receipt.seen{opacity:1;transform:translateY(0);}
-
-.msg-system{text-align:center;font-size:11px;color:var(--ink-soft);font-style:italic;margin:5px 0 12px;
-  animation:fadeUp .3s var(--ease) both;}
-
-/* Typing indicator */
-.typing-row{display:flex;align-items:center;gap:9px;margin-bottom:12px;animation:groupIn .3s var(--ease) both;}
-.typing-bubble{background:var(--recv-bg);border:1px solid var(--recv-border);border-radius:18px 18px 18px 4px;
-  padding:11px 15px;display:flex;gap:4px;box-shadow:0 2px 10px rgba(15,40,60,.08);}
-.typing-dot{width:6px;height:6px;border-radius:50%;background:var(--ink-soft);
-  animation:typingBounce 1.2s ease-in-out infinite;}
-.typing-dot:nth-child(2){animation-delay:.16s;}
-.typing-dot:nth-child(3){animation-delay:.32s;}
-@keyframes typingBounce{0%,60%,100%{transform:translateY(0);opacity:.35}30%{transform:translateY(-6px);opacity:1}}
-
-/* Input area */
-.input-area{flex-shrink:0;padding:13px 18px 18px;background:rgba(255,255,255,0.12);
-  border-top:1px solid rgba(255,255,255,0.28);display:flex;align-items:center;gap:9px;}
-.msg-input{flex:1;padding:12px 17px;background:rgba(255,255,255,0.32);border:1.5px solid rgba(255,255,255,0.45);
-  border-radius:22px;color:var(--ink);font-size:14px;font-family:inherit;font-weight:500;outline:none;
-  transition:border-color .2s var(--ease),background .2s var(--ease),box-shadow .2s var(--ease);}
-.msg-input::placeholder{color:rgba(21,36,58,.40);}
-.msg-input:focus{border-color:rgba(47,159,216,.55);background:rgba(255,255,255,0.45);
-  box-shadow:0 0 0 3px rgba(47,159,216,.12);}
-
-.send-btn{width:46px;height:46px;min-width:46px;background:linear-gradient(135deg,var(--blue),var(--teal));
-  border:none;border-radius:50%;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;
-  box-shadow:0 4px 16px rgba(47,159,216,.36);position:relative;
-  transition:transform .16s var(--ease),box-shadow .16s var(--ease);}
-.send-btn svg{width:18px;height:18px;}
-.send-btn:hover{transform:scale(1.07);box-shadow:0 8px 22px rgba(47,159,216,.50);}
-.send-btn:active{transform:scale(.92);}
-.send-btn.fire{animation:btnFire .26s var(--ease);}
-@keyframes btnFire{0%{transform:scale(1)}40%{transform:scale(.86)}100%{transform:scale(1)}}
-
-.ripple-ring{position:fixed;border-radius:50%;border:2px solid rgba(47,159,216,.45);pointer-events:none;
-  z-index:998;animation:rippleExpand .5s var(--ease) forwards;}
-@keyframes rippleExpand{from{width:0;height:0;opacity:.8;}to{width:160px;height:160px;
-  margin-left:-80px;margin-top:-80px;opacity:0;}}
-</style>
+<link rel="stylesheet" href="style.css"/>
 </head>
 <body>
 
 <canvas id="pcanvas"></canvas>
 <div id="bg"></div>
 
+<!-- LOGIN -->
 <div id="login-screen" class="screen">
   <div class="glass login-card" id="login-card">
-    <div class="logo-wrap">
-      <img class="logo-img" src="apple-touch-icon.png" alt="Glass Chat"/>
+    <div class="logo-wrap" id="logo-wrap" title="Click to set a profile picture">
+      <img class="logo-img" id="logo-img" src="apple-touch-icon.png" alt="Glass Chat"/>
+      <div class="avatar-edit-hint">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      </div>
+      <input type="file" id="avatar-upload" accept="image/*" style="display:none"/>
     </div>
     <h1 class="login-title">Glass Chat</h1>
     <p class="login-sub">A beautiful place to talk</p>
     <input class="name-input" id="name-input" type="text" placeholder="Your name..." maxlength="20" autocomplete="off" spellcheck="false"/>
+    <input class="room-input" id="room-input" type="text" placeholder="Room (default: general)" maxlength="30" autocomplete="off" spellcheck="false"/>
+    <div class="field-error" id="field-error"></div>
     <button class="join-btn" id="join-btn">Join Chat</button>
   </div>
 </div>
 
+<!-- CHAT -->
 <div id="chat-screen" class="screen hidden">
   <div class="glass chat-card">
     <header class="chat-header">
       <div class="header-left">
         <img class="header-logo" src="favicon-32.png" alt=""/>
-        <span class="header-title">Glass Chat</span>
+        <div class="header-title-wrap">
+          <span class="header-title">Glass Chat</span>
+          <span class="room-pill" id="room-pill" title="Click to switch room">#general</span>
+        </div>
       </div>
-      <div class="online-badge">
-        <span class="pulse-dot"></span>
-        <span class="online-txt" id="online-count">0 online</span>
+      <div class="header-right">
+        <button class="icon-btn" id="search-btn" title="Search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </button>
+        <button class="icon-btn" id="sound-btn" title="Toggle sound">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>
+        </button>
+        <button class="icon-btn" id="notif-btn" title="Toggle notifications">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        </button>
+        <div class="online-badge">
+          <span class="pulse-dot"></span>
+          <span class="online-txt" id="online-count">0 online</span>
+        </div>
       </div>
     </header>
+
+    <div class="search-bar" id="search-bar">
+      <input type="text" id="search-input" placeholder="Search messages..." autocomplete="off"/>
+    </div>
+
     <div class="messages" id="messages"></div>
+
+    <button class="scroll-bottom-btn" id="scroll-bottom-btn" title="Jump to latest">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
+
+    <div class="reply-bar" id="reply-bar">
+      <span class="reply-bar-text" id="reply-bar-text"></span>
+      <button class="reply-bar-close" id="reply-bar-close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <div class="edit-bar" id="edit-bar">
+      <span class="edit-bar-text">Editing message</span>
+      <button class="reply-bar-close" id="edit-bar-close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <div class="img-preview-bar" id="img-preview-bar"></div>
+
     <footer class="input-area">
-      <input class="msg-input" id="msg-input" type="text" placeholder="Message..." autocomplete="off" spellcheck="false"/>
+      <input type="file" id="img-upload" accept="image/*" style="display:none"/>
+      <button class="attach-btn" id="attach-btn" title="Attach image">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+      </button>
+      <textarea class="msg-input" id="msg-input" rows="1" placeholder="Message..." autocomplete="off" spellcheck="false"></textarea>
       <button class="send-btn" id="send-btn" title="Send">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
           <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -240,202 +110,14 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;overflow:hi
 <script>
 VANTA.FOG({el:'#bg',mouseControls:true,touchControls:true,gyroControls:false,minHeight:200,minWidth:200,
   highlightColor:0x48b8e3,midtoneColor:0xa3cfff,lowlightColor:0x28b1a6,baseColor:0xffffff});
+/* iOS/mobile keyboard viewport fix */
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', () => {
+    document.body.style.height = window.visualViewport.height + 'px';
+  });
+}
 </script>
 <script src="/socket.io/socket.io.js"></script>
-<script>
-/* Lightweight particle burst — subtle, not distracting */
-class Particles{
-  constructor(c){this.c=c;this.ctx=c.getContext('2d');this.p=[];this.raf=null;this._r();
-    window.addEventListener('resize',()=>this._r());}
-  _r(){this.c.width=innerWidth;this.c.height=innerHeight;}
-  burst(px,py,type){
-    const cfg=type==='send'
-      ?{n:14,vy:-2.0,spd:[2.5,6],sz:[1.5,3.5],dec:[0.022,0.036],cols:['#2f9fd8','#22a89c','#ffffff','#7ee8fa']}
-      :{n:9,vy:-1.2,spd:[1.2,3.4],sz:[1.2,2.6],dec:[0.026,0.040],cols:['#ffffff','#dff0ff','#bfe6ff']};
-    for(let i=0;i<cfg.n;i++){
-      const a=(Math.PI*2*i/cfg.n)+(Math.random()-0.5)*1.1;
-      const s=cfg.spd[0]+Math.random()*(cfg.spd[1]-cfg.spd[0]);
-      this.p.push({x:px,y:py,vx:Math.cos(a)*s,vy:Math.sin(a)*s+cfg.vy,
-        r:cfg.sz[0]+Math.random()*(cfg.sz[1]-cfg.sz[0]),a:0.8+Math.random()*0.15,
-        col:cfg.cols[Math.floor(Math.random()*cfg.cols.length)],
-        dec:cfg.dec[0]+Math.random()*(cfg.dec[1]-cfg.dec[0])});
-    }
-    if(!this.raf)this._loop();
-  }
-  _loop(){
-    const tick=()=>{
-      const{ctx,c}=this;ctx.clearRect(0,0,c.width,c.height);
-      this.p=this.p.filter(p=>p.a>0.01);
-      for(const p of this.p){
-        p.x+=p.vx;p.y+=p.vy;p.vy+=0.11;p.vx*=0.97;p.a-=p.dec;p.r*=0.98;
-        ctx.save();ctx.globalAlpha=Math.max(0,p.a);ctx.fillStyle=p.col;
-        ctx.beginPath();ctx.arc(p.x,p.y,Math.max(0.1,p.r),0,Math.PI*2);ctx.fill();ctx.restore();
-      }
-      if(this.p.length){this.raf=requestAnimationFrame(tick);}
-      else{this.raf=null;ctx.clearRect(0,0,c.width,c.height);}
-    };
-    this.raf=requestAnimationFrame(tick);
-  }
-}
-const ps=new Particles(document.getElementById('pcanvas'));
-
-function ripple(x,y){
-  const r=document.createElement('div');
-  r.className='ripple-ring';r.style.left=x+'px';r.style.top=y+'px';
-  document.body.appendChild(r);
-  setTimeout(()=>r.remove(),520);
-}
-
-const socket=io();
-let myName='',lastGroupEl=null,lastGroupUser=null,lastGroupTime=0;
-let typingTimers={};
-const GROUP_GAP=60000;
-const AV_COLORS=['#2f9fd8','#22a89c','#8a6fe0','#e08a4f','#3fbf72','#e667a3','#f0964e'];
-const userColor=n=>{let h=0;for(const c of n)h=(h*31+c.charCodeAt(0))&0xffff;return AV_COLORS[h%AV_COLORS.length];};
-const fmtTime=ts=>new Date(ts||Date.now()).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-function updatePositions(stack){
-  const bs=stack.querySelectorAll('.bubble');
-  bs.forEach((b,i)=>{b.dataset.pos=bs.length===1?'single':i===0?'first':i===bs.length-1?'last':'middle';});
-}
-
-const saved=localStorage.getItem('gc_name');
-if(saved)document.getElementById('name-input').value=saved;
-
-function joinChat(){
-  const inp=document.getElementById('name-input'),name=inp.value.trim();
-  if(!name){
-    inp.classList.remove('shake');void inp.offsetWidth;inp.classList.add('shake');
-    setTimeout(()=>inp.classList.remove('shake'),450);return;
-  }
-  myName=name;localStorage.setItem('gc_name',name);
-  socket.emit('join',name);
-  document.getElementById('login-card').classList.add('leaving');
-  setTimeout(()=>{
-    document.getElementById('login-screen').classList.add('hidden');
-    document.getElementById('chat-screen').classList.remove('hidden');
-    document.getElementById('msg-input').focus();
-  },280);
-}
-document.getElementById('join-btn').addEventListener('click',joinChat);
-document.getElementById('name-input').addEventListener('keydown',e=>{if(e.key==='Enter')joinChat();});
-
-function removeTypingRow(){
-  const row=document.getElementById('typing-row');
-  if(row)row.remove();
-}
-
-function addMessage(data,isOwn,fromHistory){
-  removeTypingRow();
-  const box=document.getElementById('messages');
-  const ts=data.ts||Date.now(),user=data.user;
-  const same=lastGroupEl&&lastGroupUser===user&&(ts-lastGroupTime)<GROUP_GAP;
-  let group,stack;
-  if(same){
-    group=lastGroupEl;stack=group.querySelector('.bubble-stack');
-    const oldTs=stack.querySelector('.ts');if(oldTs)oldTs.remove();
-    group.classList.add('tight');
-  }else{
-    group=document.createElement('div');
-    group.className=`msg-group ${isOwn?'own':'other'}`;
-    if(!isOwn){
-      const av=document.createElement('div');
-      av.className='avatar';av.style.background=userColor(user);
-      av.textContent=user[0].toUpperCase();group.appendChild(av);
-    }
-    stack=document.createElement('div');stack.className='bubble-stack';
-    if(!isOwn){
-      const nm=document.createElement('div');nm.className='sender-name';nm.textContent=user;
-      stack.appendChild(nm);
-    }
-    group.appendChild(stack);box.appendChild(group);
-  }
-  const bubble=document.createElement('div');
-  bubble.className='bubble'+(fromHistory?'':' pop');
-  bubble.textContent=data.text;bubble.dataset.id=data.id||'';
-  stack.appendChild(bubble);
-
-  const tsEl=document.createElement('div');tsEl.className='ts';
-  const tsText=document.createElement('span');tsText.textContent=fmtTime(ts);
-  tsEl.appendChild(tsText);
-  if(isOwn){
-    const rc=document.createElement('span');
-    rc.className='receipt';rc.dataset.id=data.id||'';rc.textContent='Read';
-    if(data.seenBy&&data.seenBy.length)rc.classList.add('seen');
-    tsEl.appendChild(rc);
-  }
-  stack.appendChild(tsEl);
-  updatePositions(stack);
-  lastGroupEl=group;lastGroupUser=user;lastGroupTime=ts;
-  box.scrollTop=box.scrollHeight;
-
-  if(!isOwn&&data.id)socket.emit('seen',{id:data.id,reader:myName});
-}
-
-function addSystem(text){
-  removeTypingRow();
-  const box=document.getElementById('messages');
-  const div=document.createElement('div');div.className='msg-system';div.textContent=text;
-  box.appendChild(div);box.scrollTop=box.scrollHeight;lastGroupEl=null;lastGroupUser=null;
-}
-
-function showTyping(user){
-  removeTypingRow();
-  const box=document.getElementById('messages');
-  const row=document.createElement('div');
-  row.id='typing-row';row.className='typing-row';
-  const av=document.createElement('div');
-  av.className='avatar';av.style.background=userColor(user);
-  av.textContent=user[0].toUpperCase();
-  const bub=document.createElement('div');bub.className='typing-bubble';
-  bub.innerHTML='<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
-  row.appendChild(av);row.appendChild(bub);
-  box.appendChild(row);box.scrollTop=box.scrollHeight;
-}
-
-let typingDebounce=null;
-document.getElementById('msg-input').addEventListener('input',()=>{
-  if(!myName)return;
-  socket.emit('typing',myName);
-});
-
-function sendMsg(){
-  const inp=document.getElementById('msg-input'),text=inp.value.trim();
-  if(!text||!myName)return;
-  socket.emit('message',{user:myName,text});inp.value='';
-  const btn=document.getElementById('send-btn');
-  const r=btn.getBoundingClientRect();
-  ps.burst(r.left+r.width/2,r.top+r.height/2,'send');
-  ripple(r.left+r.width/2,r.top+r.height/2);
-  btn.classList.remove('fire');void btn.offsetWidth;btn.classList.add('fire');
-}
-document.getElementById('send-btn').addEventListener('click',sendMsg);
-document.getElementById('msg-input').addEventListener('keydown',e=>{if(e.key==='Enter')sendMsg();});
-
-socket.on('history',msgs=>{
-  const box=document.getElementById('messages');box.innerHTML='';
-  lastGroupEl=null;lastGroupUser=null;
-  msgs.forEach(m=>addMessage(m,m.user===myName,true));
-});
-socket.on('message',data=>{
-  const isOwn=data.socketId===socket.id;
-  addMessage(data,isOwn,false);
-  if(!isOwn){
-    const r=document.getElementById('messages').getBoundingClientRect();
-    ps.burst(r.left+60,r.bottom-75,'recv');
-  }
-});
-socket.on('seen-update',({id,reader})=>{
-  const rc=document.querySelector(`.receipt[data-id="${id}"]`);
-  if(rc&&!rc.classList.contains('seen'))rc.classList.add('seen');
-});
-socket.on('typing',user=>{
-  if(user===myName)return;
-  showTyping(user);
-  clearTimeout(typingTimers[user]);
-  typingTimers[user]=setTimeout(removeTypingRow,2200);
-});
-socket.on('system',text=>addSystem(text));
-socket.on('user-count',n=>{document.getElementById('online-count').textContent=`${n} online`;});
-</script>
+<script src="app.js"></script>
 </body>
 </html>
