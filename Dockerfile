@@ -21,6 +21,8 @@ COPY --from=builder --chown=glasschat:glasschat /app/server.js ./server.js
 COPY --from=builder --chown=glasschat:glasschat /app/package.json ./package.json
 COPY --from=builder --chown=glasschat:glasschat /app/public ./public
 
+RUN mkdir -p /app/data && chown glasschat:glasschat /app/data
+
 USER glasschat
 
 ENV PORT=3000
