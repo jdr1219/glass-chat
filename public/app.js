@@ -1,6 +1,6 @@
 /* ════════ Glass Chat — client ════════ */
 const socket = io();
-let myName = '', myRoom = 'general', myAvatar = null;
+let myName = '';
 let lastGroupEl = null, lastGroupUser = null, lastGroupTime = 0;
 let replyTarget = null, editTarget = null;
 let typingTimers = {};
@@ -9,7 +9,7 @@ let soundOn = localStorage.getItem('gc_sound') !== 'off';
 let notifOn = localStorage.getItem('gc_notif') === 'on';
 let lastDateKey = '';
 const GROUP_GAP = 60000;
-const AV_COLORS = ['#2f9fd8','#22a89c','#8a6fe0','#e08a4f','#3fbf72','#e667a3','#f0964e'];
+const AV_COLORS = ['#3fa9e0','#1f7fc9','#5ab3e6','#2f8fd4','#6cc2ec','#1a6bb8'];
 const REACTION_SET = ['👍','❤️','😂','😮','😢','🙏'];
 
 const $ = id => document.getElementById(id);
@@ -17,10 +17,7 @@ const userColor = n => { let h=0; for (const c of n) h=(h*31+c.charCodeAt(0))&0x
 const fmtTime = ts => new Date(ts||Date.now()).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
 const escapeHtml = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
-function dateKey(ts) {
-  const d = new Date(ts);
-  return d.toDateString();
-}
+function dateKey(ts) { return new Date(ts).toDateString(); }
 function dateLabel(ts) {
   const d = new Date(ts), today = new Date(), yest = new Date(Date.now()-86400000);
   if (d.toDateString() === today.toDateString()) return 'Today';
@@ -45,7 +42,7 @@ class Particles {
   _r(){this.c.width=innerWidth;this.c.height=innerHeight;}
   burst(px,py,type){
     const cfg = type==='send'
-      ? {n:14,vy:-2.0,spd:[2.5,6],sz:[1.5,3.5],dec:[0.022,0.036],cols:['#2f9fd8','#22a89c','#ffffff','#7ee8fa']}
+      ? {n:14,vy:-2.0,spd:[2.5,6],sz:[1.5,3.5],dec:[0.022,0.036],cols:['#3fa9e0','#1f7fc9','#ffffff','#a3cfff']}
       : {n:9,vy:-1.2,spd:[1.2,3.4],sz:[1.2,2.6],dec:[0.026,0.040],cols:['#ffffff','#dff0ff','#bfe6ff']};
     for(let i=0;i<cfg.n;i++){
       const a=(Math.PI*2*i/cfg.n)+(Math.random()-0.5)*1.1;
@@ -80,22 +77,35 @@ function ripple(x,y){
   setTimeout(()=>r.remove(),520);
 }
 
-/* ── sound ── */
+/* ── notification sound: soft two-note chime, gentle attack/decay ── */
 let actx = null;
-function beep(freq=880, dur=0.08, vol=0.06) {
+function playTone(freq, startOffset, dur, vol) {
+  const now = actx.currentTime + startOffset;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = 'sine'; o.frequency.value = freq;
+  g.gain.setValueAtTime(0, now);
+  g.gain.linearRampToValueAtTime(vol, now + 0.015);
+  g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+  o.connect(g); g.connect(actx.destination);
+  o.start(now); o.stop(now + dur + 0.02);
+}
+function chime() {
   if (!soundOn) return;
   try {
     actx = actx || new (window.AudioContext||window.webkitAudioContext)();
-    const o = actx.createOscillator(), g = actx.createGain();
-    o.frequency.value = freq; o.type = 'sine';
-    g.gain.value = vol;
-    o.connect(g); g.connect(actx.destination);
-    o.start(); g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + dur);
-    o.stop(actx.currentTime + dur);
+    playTone(987.77, 0,    0.16, 0.05);  // B5
+    playTone(1318.5, 0.07, 0.22, 0.045); // E6 — gentle rising interval
+  } catch {}
+}
+function sendTick() {
+  if (!soundOn) return;
+  try {
+    actx = actx || new (window.AudioContext||window.webkitAudioContext)();
+    playTone(740, 0, 0.09, 0.035);
   } catch {}
 }
 
-/* ── avatar upload (resize to small dataURL) ── */
+/* ── image resize helper ── */
 function fileToResizedDataUrl(file, maxDim, quality) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -116,30 +126,13 @@ function fileToResizedDataUrl(file, maxDim, quality) {
 
 /* ── login ── */
 const savedName = localStorage.getItem('gc_name');
-const savedAvatar = localStorage.getItem('gc_avatar');
-const savedRoom = localStorage.getItem('gc_room') || 'general';
 if (savedName) $('name-input').value = savedName;
-if (savedRoom) $('room-input').value = savedRoom;
-if (savedAvatar) { myAvatar = savedAvatar; $('logo-img').src = savedAvatar; }
 
-$('avatar-upload').addEventListener('change', async e => {
-  const file = e.target.files[0]; if (!file) return;
-  try {
-    const dataUrl = await fileToResizedDataUrl(file, 128, 0.85);
-    myAvatar = dataUrl; $('logo-img').src = dataUrl;
-    localStorage.setItem('gc_avatar', dataUrl);
-  } catch {}
-});
-$('logo-wrap').addEventListener('click', () => $('avatar-upload').click());
-
-function showFieldError(msg) {
-  $('field-error').textContent = msg || '';
-}
+function showFieldError(msg) { $('field-error').textContent = msg || ''; }
 
 function joinChat() {
-  const nameInp = $('name-input'), roomInp = $('room-input');
+  const nameInp = $('name-input');
   const name = nameInp.value.trim();
-  const room = (roomInp.value.trim() || 'general').toLowerCase().replace(/[^a-z0-9-_]/g, '').slice(0,30) || 'general';
   if (!name) {
     nameInp.classList.remove('shake'); void nameInp.offsetWidth; nameInp.classList.add('shake');
     showFieldError('Enter a name to continue');
@@ -148,26 +141,22 @@ function joinChat() {
   }
   showFieldError('');
   $('join-btn').disabled = true;
-  myName = name; myRoom = room;
+  myName = name;
   localStorage.setItem('gc_name', name);
-  localStorage.setItem('gc_room', room);
-  socket.emit('join', { name, room, avatar: myAvatar });
+  socket.emit('join', { name });
 }
 $('join-btn').addEventListener('click', joinChat);
 $('name-input').addEventListener('keydown', e => { if (e.key==='Enter') joinChat(); });
-$('room-input').addEventListener('keydown', e => { if (e.key==='Enter') joinChat(); });
 
 socket.on('name-taken', () => {
   $('join-btn').disabled = false;
-  showFieldError('That name is already taken in this room');
+  showFieldError('That name is already taken');
   $('name-input').classList.remove('shake'); void $('name-input').offsetWidth; $('name-input').classList.add('shake');
 });
 socket.on('error-msg', msg => showFieldError(msg));
 
-socket.on('join-success', ({ room }) => {
-  myRoom = room;
+socket.on('join-success', () => {
   $('join-btn').disabled = false;
-  $('room-pill').textContent = '#' + room;
   if (!hasJoinedOnce) {
     hasJoinedOnce = true;
     $('login-card').classList.add('leaving');
@@ -177,21 +166,8 @@ socket.on('join-success', ({ room }) => {
       $('msg-input').focus();
     }, 280);
   } else {
-    // returning from a room switch / reconnect
-    $('messages').innerHTML = '';
-    lastGroupEl = null; lastGroupUser = null; lastDateKey = '';
     hideReconnectBanner();
   }
-});
-
-/* ── room switch ── */
-$('room-pill').addEventListener('click', () => {
-  const next = prompt('Switch room:', myRoom);
-  if (!next) return;
-  const room = next.trim().toLowerCase().replace(/[^a-z0-9-_]/g, '').slice(0,30) || 'general';
-  if (room === myRoom) return;
-  localStorage.setItem('gc_room', room);
-  socket.emit('join', { name: myName, room, avatar: myAvatar });
 });
 
 /* ── grouping / positions ── */
@@ -322,8 +298,8 @@ function addMessage(data, isOwn, fromHistory) {
     if (!isOwn) {
       const av = document.createElement('div');
       av.className = 'avatar';
-      if (data.avatar) { const img = document.createElement('img'); img.src = data.avatar; av.appendChild(img); }
-      else { av.style.background = userColor(user); av.textContent = user[0].toUpperCase(); }
+      av.style.background = userColor(user);
+      av.textContent = user[0].toUpperCase();
       group.appendChild(av);
     }
     stack = document.createElement('div'); stack.className = 'bubble-stack';
@@ -341,7 +317,7 @@ function addMessage(data, isOwn, fromHistory) {
   const bubble = document.createElement('div');
   bubble.className = 'bubble' + (fromHistory ? '' : ' pop') + (data.deleted ? ' deleted' : '');
   bubble.dataset.id = data.id || '';
-  if (data.text && data.text.toLowerCase().includes('@'+myName.toLowerCase()) && !isOwn) bubble.classList.add('mentioned');
+  if (data.text && myName && data.text.toLowerCase().includes('@'+myName.toLowerCase()) && !isOwn) bubble.classList.add('mentioned');
 
   if (data.deleted) {
     bubble.textContent = 'Message deleted';
@@ -396,7 +372,7 @@ function addMessage(data, isOwn, fromHistory) {
 
   if (!isOwn && data.id && !data.deleted) socket.emit('seen', { id: data.id });
   if (!isOwn && !fromHistory) {
-    beep(720, 0.07, 0.05);
+    chime();
     if (notifOn && document.hidden) notify(user, data.text || 'Sent an image');
   }
 }
@@ -411,13 +387,12 @@ function addSystem(text) {
 
 /* ── typing ── */
 function removeTypingRow() { const row = $('typing-row'); if (row) row.remove(); }
-function showTyping(user, avatar) {
+function showTyping(user) {
   removeTypingRow();
   const box = $('messages');
   const row = document.createElement('div'); row.id = 'typing-row'; row.className = 'typing-row';
   const av = document.createElement('div'); av.className = 'avatar';
-  if (avatar) { const img=document.createElement('img'); img.src=avatar; av.appendChild(img); }
-  else { av.style.background = userColor(user); av.textContent = user[0].toUpperCase(); }
+  av.style.background = userColor(user); av.textContent = user[0].toUpperCase();
   const bub = document.createElement('div'); bub.className = 'typing-bubble';
   bub.innerHTML = '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
   row.appendChild(av); row.appendChild(bub);
@@ -454,6 +429,7 @@ function sendMsg() {
   pendingImage = null; $('img-preview-bar').classList.remove('open'); $('img-preview-bar').innerHTML = '';
   replyTarget = null; $('reply-bar').classList.remove('open');
 
+  sendTick();
   const btn = $('send-btn');
   const r = btn.getBoundingClientRect();
   ps.burst(r.left + r.width/2, r.top + r.height/2, 'send');
@@ -573,7 +549,7 @@ $('sound-btn').addEventListener('click', () => {
   soundOn = !soundOn;
   localStorage.setItem('gc_sound', soundOn ? 'on' : 'off');
   $('sound-btn').classList.toggle('active', soundOn);
-  if (soundOn) beep(880, 0.08, 0.06);
+  if (soundOn) chime();
 });
 if (soundOn) $('sound-btn').classList.add('active');
 
@@ -595,7 +571,6 @@ function showReconnectBanner() {
   let b = document.getElementById('reconnect-banner');
   if (!b) {
     b = document.createElement('div'); b.id = 'reconnect-banner';
-    b.style.cssText = 'position:absolute;top:0;left:0;right:0;z-index:8;background:rgba(224,90,90,.85);color:#fff;text-align:center;font-size:12px;font-weight:600;padding:7px;backdrop-filter:blur(10px);';
     b.textContent = 'Connection lost — reconnecting…';
     document.querySelector('#chat-screen .chat-card').prepend(b);
   }
@@ -614,11 +589,8 @@ socket.on('history-has-more', has => { hasMoreHistory = has; renderLoadMoreRow()
 socket.on('more-history', ({ msgs, hasMore }) => {
   const box = $('messages');
   const prevHeight = box.scrollHeight;
-  const frag = document.createDocumentFragment();
-  const temp = document.createElement('div');
   lastGroupEl = null; lastGroupUser = null;
   msgs.forEach(m => addMessage(m, m.user === myName, true));
-  // addMessage appended to the live DOM; move newly added nodes before old content handled by date-divider logic naturally
   hasMoreHistory = hasMore;
   oldestTs = msgs.length ? msgs[0].ts : oldestTs;
   renderLoadMoreRow();
@@ -636,12 +608,10 @@ socket.on('message', data => {
 socket.on('msg-edited', ({ id, text }) => {
   const bubble = document.querySelector(`.bubble[data-id="${id}"]`);
   if (!bubble) return;
-  const textDiv = bubble.querySelector('div') || bubble;
-  // re-render rich text in place (first child div holds text if present)
   const firstDiv = bubble.querySelector(':scope > div');
   if (firstDiv && !firstDiv.classList.contains('reply-quote')) firstDiv.innerHTML = renderRich(text);
   else bubble.insertAdjacentHTML('beforeend', renderRich(text));
-  const ts = bubble.closest('.bubble-wrap')?.parentElement?.querySelector('.ts span:first-child');
+  const ts = bubble.closest('.bubble-stack')?.querySelector('.ts span:first-child');
   if (ts && !ts.textContent.includes('edited')) ts.textContent += ' · edited';
 });
 socket.on('msg-deleted', ({ id }) => {
@@ -680,5 +650,5 @@ socket.on('user-count', n => { $('online-count').textContent = `${n} online`; })
 
 socket.on('disconnect', () => { if (hasJoinedOnce) showReconnectBanner(); });
 socket.on('connect', () => {
-  if (hasJoinedOnce && myName) socket.emit('join', { name: myName, room: myRoom, avatar: myAvatar });
+  if (hasJoinedOnce && myName) socket.emit('join', { name: myName });
 });
