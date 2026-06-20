@@ -261,8 +261,7 @@ function buildBubbleActions(msg, isOwn) {
   return wrap;
 }
 
-/* ── long-press to reveal actions on touch devices ── */
-const LONG_PRESS_MS = 420;
+/* ── tap to reveal actions on touch devices, tap again to hide ── */
 const MOVE_CANCEL_PX = 10;
 let activeActionsGroup = null;
 
@@ -270,39 +269,41 @@ function closeActiveActions() {
   if (activeActionsGroup) { activeActionsGroup.classList.remove('actions-visible'); activeActionsGroup = null; }
 }
 
-function attachLongPress(bubble, group) {
-  let timer = null, startX = 0, startY = 0, fired = false;
+function attachTapToggle(bubble, group) {
+  let startX = 0, startY = 0, moved = false;
 
   bubble.addEventListener('touchstart', e => {
     const t = e.touches[0];
-    startX = t.clientX; startY = t.clientY; fired = false;
+    startX = t.clientX; startY = t.clientY; moved = false;
     bubble.classList.add('pressing');
-    timer = setTimeout(() => {
-      fired = true;
-      bubble.classList.remove('pressing');
-      if (activeActionsGroup && activeActionsGroup !== group) activeActionsGroup.classList.remove('actions-visible');
-      group.classList.add('actions-visible');
-      activeActionsGroup = group;
-      if (navigator.vibrate) navigator.vibrate(8);
-    }, LONG_PRESS_MS);
   }, { passive: true });
 
   bubble.addEventListener('touchmove', e => {
     const t = e.touches[0];
     if (Math.abs(t.clientX - startX) > MOVE_CANCEL_PX || Math.abs(t.clientY - startY) > MOVE_CANCEL_PX) {
-      clearTimeout(timer);
+      moved = true;
       bubble.classList.remove('pressing');
     }
   }, { passive: true });
 
-  bubble.addEventListener('touchend', () => {
-    clearTimeout(timer);
+  bubble.addEventListener('touchend', e => {
     bubble.classList.remove('pressing');
+    if (moved) return; // was a scroll, not a tap
+    if (e.target.tagName === 'IMG' || e.target.closest('a')) return; // let image/link taps do their own thing
+    e.preventDefault();
+    const isOpen = group.classList.contains('actions-visible');
+    if (activeActionsGroup && activeActionsGroup !== group) activeActionsGroup.classList.remove('actions-visible');
+    if (isOpen) {
+      group.classList.remove('actions-visible');
+      activeActionsGroup = null;
+    } else {
+      group.classList.add('actions-visible');
+      activeActionsGroup = group;
+      if (navigator.vibrate) navigator.vibrate(8);
+    }
   });
-  bubble.addEventListener('touchcancel', () => {
-    clearTimeout(timer);
-    bubble.classList.remove('pressing');
-  });
+
+  bubble.addEventListener('touchcancel', () => bubble.classList.remove('pressing'));
 }
 
 document.addEventListener('touchstart', e => {
@@ -391,7 +392,7 @@ function addMessage(data, isOwn, fromHistory) {
     }
   }
   bubble.addEventListener('dblclick', () => openEmojiPicker(data.id, bubbleWrap));
-  attachLongPress(bubble, group);
+  attachTapToggle(bubble, group);
 
   if (isOwn) bubbleWrap.appendChild(buildBubbleActions(data, true));
   bubbleWrap.appendChild(bubble);
