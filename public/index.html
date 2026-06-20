@@ -102,11 +102,6 @@
 <script>
 VANTA.FOG({el:'#bg',mouseControls:true,touchControls:true,gyroControls:false,minHeight:200,minWidth:200,
   highlightColor:0x48b8e3,midtoneColor:0xa3cfff,lowlightColor:0x28b1a6,baseColor:0xffffff});
-if (window.visualViewport) {
-  window.visualViewport.addEventListener('resize', () => {
-    document.body.style.height = window.visualViewport.height + 'px';
-  });
-}
 </script>
 <script src="/socket.io/socket.io.js"></script>
 <script src="app.js"></script>
