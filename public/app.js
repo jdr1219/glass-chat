@@ -261,7 +261,58 @@ function buildBubbleActions(msg, isOwn) {
   return wrap;
 }
 
-/* ── reply / edit bars ── */
+/* ── long-press to reveal actions on touch devices ── */
+const LONG_PRESS_MS = 420;
+const MOVE_CANCEL_PX = 10;
+let activeActionsGroup = null;
+
+function closeActiveActions() {
+  if (activeActionsGroup) { activeActionsGroup.classList.remove('actions-visible'); activeActionsGroup = null; }
+}
+
+function attachLongPress(bubble, group) {
+  let timer = null, startX = 0, startY = 0, fired = false;
+
+  bubble.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    startX = t.clientX; startY = t.clientY; fired = false;
+    bubble.classList.add('pressing');
+    timer = setTimeout(() => {
+      fired = true;
+      bubble.classList.remove('pressing');
+      if (activeActionsGroup && activeActionsGroup !== group) activeActionsGroup.classList.remove('actions-visible');
+      group.classList.add('actions-visible');
+      activeActionsGroup = group;
+      if (navigator.vibrate) navigator.vibrate(8);
+    }, LONG_PRESS_MS);
+  }, { passive: true });
+
+  bubble.addEventListener('touchmove', e => {
+    const t = e.touches[0];
+    if (Math.abs(t.clientX - startX) > MOVE_CANCEL_PX || Math.abs(t.clientY - startY) > MOVE_CANCEL_PX) {
+      clearTimeout(timer);
+      bubble.classList.remove('pressing');
+    }
+  }, { passive: true });
+
+  bubble.addEventListener('touchend', () => {
+    clearTimeout(timer);
+    bubble.classList.remove('pressing');
+  });
+  bubble.addEventListener('touchcancel', () => {
+    clearTimeout(timer);
+    bubble.classList.remove('pressing');
+  });
+}
+
+document.addEventListener('touchstart', e => {
+  if (activeActionsGroup && !activeActionsGroup.contains(e.target)) closeActiveActions();
+}, { passive: true });
+document.addEventListener('click', e => {
+  if (activeActionsGroup && !activeActionsGroup.contains(e.target)) closeActiveActions();
+});
+
+
 function startReply(msg) {
   replyTarget = msg;
   $('reply-bar').classList.add('open');
@@ -340,6 +391,7 @@ function addMessage(data, isOwn, fromHistory) {
     }
   }
   bubble.addEventListener('dblclick', () => openEmojiPicker(data.id, bubbleWrap));
+  attachLongPress(bubble, group);
 
   if (isOwn) bubbleWrap.appendChild(buildBubbleActions(data, true));
   bubbleWrap.appendChild(bubble);
