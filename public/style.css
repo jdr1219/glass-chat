@@ -16,8 +16,8 @@
   --ease-in: cubic-bezier(.4, 0, 1, 1);
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { height: 100%; overflow: hidden; }
-body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; overflow: hidden; height: 100%; position: fixed; width: 100%; background: #9fd8f0; }
+html { height: 100%; overflow: hidden; touch-action: manipulation; }
+body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; overflow: hidden; height: 100%; position: fixed; width: 100%; background: #9fd8f0; touch-action: manipulation; }
 #bg { position: fixed; inset: 0; z-index: 0; }
 #pcanvas { position: fixed; inset: 0; z-index: 999; pointer-events: none; }
 .screen { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 16px; }
@@ -45,7 +45,7 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; over
 .login-sub { font-size:13.5px; color:var(--ink-soft); margin-bottom:36px; letter-spacing:.1px; animation: fadeUp .5s var(--ease) .16s both; }
 @keyframes fadeUp { from{opacity:0;transform:translateY(10px);} to{opacity:1;transform:translateY(0);} }
 
-.name-input { width:100%; padding:14px 20px; background:rgba(255,255,255,0.40); border:1.5px solid rgba(255,255,255,0.55); border-radius:14px; color:var(--ink); font-size:15px; font-family:inherit; font-weight:600; outline:none; text-align:center; letter-spacing:.2px; transition:border-color .2s var(--ease),background .2s var(--ease),box-shadow .2s var(--ease); margin-bottom:12px; animation: fadeUp .5s var(--ease) .22s both; }
+.name-input { width:100%; padding:14px 20px; background:rgba(255,255,255,0.40); border:1.5px solid rgba(255,255,255,0.55); border-radius:14px; color:var(--ink); font-size:16px; font-family:inherit; font-weight:600; outline:none; text-align:center; letter-spacing:.2px; transition:border-color .2s var(--ease),background .2s var(--ease),box-shadow .2s var(--ease); margin-bottom:12px; animation: fadeUp .5s var(--ease) .22s both; }
 .name-input::placeholder { color:rgba(21,36,58,0.38); font-weight:500; }
 .name-input:focus { border-color:rgba(63,169,224,.75); background:rgba(255,255,255,0.55); box-shadow:0 0 0 4px rgba(63,169,224,.16); }
 .name-input.shake { animation: shake .4s var(--ease); border-color:rgba(31,79,122,.55); }
@@ -80,7 +80,7 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; over
 
 .search-bar { flex-shrink:0; max-height:0; overflow:hidden; transition:max-height .25s var(--ease); background:rgba(255,255,255,0.12); border-bottom:1px solid rgba(255,255,255,0.25); }
 .search-bar.open { max-height:56px; }
-.search-bar input { width:100%; padding:13px 18px; background:transparent; border:none; outline:none; color:var(--ink); font-size:14px; font-family:inherit; }
+.search-bar input { width:100%; padding:13px 18px; background:transparent; border:none; outline:none; color:var(--ink); font-size:16px; font-family:inherit; }
 .search-bar input::placeholder { color:rgba(21,36,58,.4); }
 .search-hit { outline:2px solid rgba(63,169,224,.65) !important; }
 
@@ -201,7 +201,7 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; over
 .edit-bar-text { flex:1; font-size:12px; color:var(--blue-deep); font-weight:600; }
 
 .input-area { flex-shrink:0; padding:13px 18px 18px; background:rgba(255,255,255,0.12); border-top:1px solid rgba(255,255,255,0.28); display:flex; align-items:flex-end; gap:9px; }
-.msg-input { flex:1; padding:12px 17px; background:rgba(255,255,255,0.32); border:1.5px solid rgba(255,255,255,0.45); border-radius:22px; color:var(--ink); font-size:14px; font-family:inherit; font-weight:500; outline:none; resize:none; max-height:120px; line-height:1.4; transition:border-color .2s var(--ease),background .2s var(--ease),box-shadow .2s var(--ease); }
+.msg-input { flex:1; padding:12px 17px; background:rgba(255,255,255,0.32); border:1.5px solid rgba(255,255,255,0.45); border-radius:22px; color:var(--ink); font-size:16px; font-family:inherit; font-weight:500; outline:none; resize:none; max-height:120px; line-height:1.4; transition:border-color .2s var(--ease),background .2s var(--ease),box-shadow .2s var(--ease); }
 .msg-input::placeholder { color:rgba(21,36,58,.40); }
 .msg-input:focus { border-color:rgba(63,169,224,.55); background:rgba(255,255,255,0.45); box-shadow:0 0 0 3px rgba(63,169,224,.14); }
 
