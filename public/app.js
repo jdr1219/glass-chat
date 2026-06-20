@@ -24,6 +24,13 @@ function dateLabel(ts) {
   if (d.toDateString() === yest.toDateString()) return 'Yesterday';
   return d.toLocaleDateString([], { month:'short', day:'numeric', year: d.getFullYear()!==today.getFullYear()?'numeric':undefined });
 }
+function timeAgo(ts) {
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return `${Math.floor(s/60)}m ago`;
+  if (s < 86400) return `${Math.floor(s/3600)}h ago`;
+  return `${Math.floor(s/86400)}d ago`;
+}
 
 /* Lightweight inline markdown -> safe HTML (bold/italic/code/links/mentions) */
 function renderRich(text) {
@@ -93,8 +100,8 @@ function chime() {
   if (!soundOn) return;
   try {
     actx = actx || new (window.AudioContext||window.webkitAudioContext)();
-    playTone(987.77, 0,    0.16, 0.05);  // B5
-    playTone(1318.5, 0.07, 0.22, 0.045); // E6 — gentle rising interval
+    playTone(987.77, 0,    0.16, 0.05);
+    playTone(1318.5, 0.07, 0.22, 0.045);
   } catch {}
 }
 function sendTick() {
@@ -124,13 +131,50 @@ function fileToResizedDataUrl(file, maxDim, quality) {
   });
 }
 
-/* ── login ── */
+/* ── per-browser identity ── */
 let clientId = localStorage.getItem('gc_client_id');
 if (!clientId) {
   clientId = (window.crypto?.randomUUID?.() || (Date.now() + '_' + Math.random().toString(36).slice(2)));
   localStorage.setItem('gc_client_id', clientId);
 }
 
+/* ════════════════════════════════════════════════
+   PERSONAL "delete for me" / Recently Deleted store
+   100% client-side — server and other clients never
+   know a message was hidden this way.
+════════════════════════════════════════════════ */
+const allMessages = new Map(); // id -> latest known full message data
+
+function getRecentlyDeleted() {
+  try { return JSON.parse(localStorage.getItem('gc_recently_deleted') || '[]'); }
+  catch { return []; }
+}
+function saveRecentlyDeleted(arr) {
+  localStorage.setItem('gc_recently_deleted', JSON.stringify(arr.slice(0, 300)));
+}
+function getHiddenIds() {
+  return new Set(getRecentlyDeleted().map(e => e.id));
+}
+function addToRecentlyDeleted(entry) {
+  const arr = getRecentlyDeleted();
+  if (!arr.find(e => e.id === entry.id)) {
+    arr.unshift({ ...entry, deletedAt: Date.now() });
+    saveRecentlyDeleted(arr);
+  }
+}
+function removeFromRecentlyDeleted(id) {
+  saveRecentlyDeleted(getRecentlyDeleted().filter(e => e.id !== id));
+}
+
+/* Hide a message from MY view only. If alsoUnsend, also tell the server
+   to globally delete it (only valid/used for your OWN messages). */
+function hideMessageLocally(msg, alsoUnsend) {
+  addToRecentlyDeleted({ ...msg, wasGlobalUnsend: !!alsoUnsend });
+  if (alsoUnsend) socket.emit('delete-msg', { id: msg.id });
+  rerenderAll();
+}
+
+/* ── login ── */
 const savedName = localStorage.getItem('gc_name');
 if (savedName) $('name-input').value = savedName;
 
@@ -236,14 +280,23 @@ function svgIcon(name) {
     edit:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
     trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
     close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+    restore: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>',
+    dots: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>',
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>',
   };
   return icons[name] || '';
 }
 
+/* ── per-message action bar ──
+   React + Reply available on everyone's messages.
+   Edit is own-only. Delete is available on ANY message —
+   for your own it also unsends globally; for others it
+   only ever hides the message from YOUR view. */
 function buildBubbleActions(msg, isOwn) {
   const wrap = document.createElement('div');
   wrap.className = 'bubble-actions';
-  if (msg.deleted) return wrap; // no actions on a deleted message
+  if (msg.deleted) return wrap;
+
   const reactBtn = document.createElement('button');
   reactBtn.innerHTML = svgIcon('react'); reactBtn.title = 'React';
   reactBtn.addEventListener('click', e => { e.stopPropagation(); openEmojiPicker(msg.id, wrap.parentElement); });
@@ -254,21 +307,27 @@ function buildBubbleActions(msg, isOwn) {
   replyBtn.addEventListener('click', e => { e.stopPropagation(); startReply(msg); });
   wrap.appendChild(replyBtn);
 
-  if (isOwn && !msg.deleted) {
+  if (isOwn) {
     const editBtn = document.createElement('button');
     editBtn.innerHTML = svgIcon('edit'); editBtn.title = 'Edit';
     editBtn.addEventListener('click', e => { e.stopPropagation(); startEdit(msg); });
     wrap.appendChild(editBtn);
-
-    const delBtn = document.createElement('button');
-    delBtn.innerHTML = svgIcon('trash'); delBtn.title = 'Delete';
-    delBtn.addEventListener('click', e => { e.stopPropagation(); if (confirm('Delete this message?')) socket.emit('delete-msg', { id: msg.id }); });
-    wrap.appendChild(delBtn);
   }
+
+  const delBtn = document.createElement('button');
+  delBtn.innerHTML = svgIcon('trash');
+  delBtn.title = isOwn ? 'Unsend' : 'Remove from your view';
+  delBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    const ok = confirm(isOwn ? 'Unsend this message for everyone?' : 'Remove this message from your view? No one else will know.');
+    if (ok) hideMessageLocally(msg, isOwn);
+  });
+  wrap.appendChild(delBtn);
   return wrap;
 }
 
-/* ── tap to reveal actions on touch devices, tap again to hide ── */
+/* ── tap to reveal actions on touch devices, tap again to hide
+   (disabled while select mode is active — taps select instead) ── */
 const MOVE_CANCEL_PX = 10;
 let activeActionsGroup = null;
 
@@ -280,12 +339,14 @@ function attachTapToggle(bubble, group) {
   let startX = 0, startY = 0, moved = false;
 
   bubble.addEventListener('touchstart', e => {
+    if (selectMode) return;
     const t = e.touches[0];
     startX = t.clientX; startY = t.clientY; moved = false;
     bubble.classList.add('pressing');
   }, { passive: true });
 
   bubble.addEventListener('touchmove', e => {
+    if (selectMode) return;
     const t = e.touches[0];
     if (Math.abs(t.clientX - startX) > MOVE_CANCEL_PX || Math.abs(t.clientY - startY) > MOVE_CANCEL_PX) {
       moved = true;
@@ -294,9 +355,10 @@ function attachTapToggle(bubble, group) {
   }, { passive: true });
 
   bubble.addEventListener('touchend', e => {
+    if (selectMode) return;
     bubble.classList.remove('pressing');
-    if (moved) return; // was a scroll, not a tap
-    if (e.target.tagName === 'IMG' || e.target.closest('a')) return; // let image/link taps do their own thing
+    if (moved) return;
+    if (e.target.tagName === 'IMG' || e.target.closest('a')) return;
     e.preventDefault();
     const isOpen = group.classList.contains('actions-visible');
     if (activeActionsGroup && activeActionsGroup !== group) activeActionsGroup.classList.remove('actions-visible');
@@ -314,12 +376,151 @@ function attachTapToggle(bubble, group) {
 }
 
 document.addEventListener('touchstart', e => {
+  if (selectMode) return;
   if (activeActionsGroup && !activeActionsGroup.contains(e.target)) closeActiveActions();
 }, { passive: true });
 document.addEventListener('click', e => {
+  if (selectMode) return;
   if (activeActionsGroup && !activeActionsGroup.contains(e.target)) closeActiveActions();
 });
 
+/* ════════════════════════════════════════════════
+   SELECT MODE — bulk delete
+════════════════════════════════════════════════ */
+let selectMode = false;
+const selectedIds = new Set();
+
+function updateSelectBar() {
+  $('select-count').textContent = `${selectedIds.size} selected`;
+  $('select-delete-btn').disabled = selectedIds.size === 0;
+}
+
+function enterSelectMode() {
+  selectMode = true;
+  selectedIds.clear();
+  closeActiveActions();
+  document.body.classList.add('select-mode-active');
+  $('select-bar').classList.add('open');
+  updateSelectBar();
+}
+function exitSelectMode() {
+  selectMode = false;
+  selectedIds.clear();
+  document.body.classList.remove('select-mode-active');
+  document.querySelectorAll('.bubble-wrap.selected').forEach(w => w.classList.remove('selected'));
+  $('select-bar').classList.remove('open');
+}
+
+$('select-mode-btn').addEventListener('click', () => {
+  $('more-menu').classList.remove('open');
+  enterSelectMode();
+});
+$('select-cancel-btn').addEventListener('click', exitSelectMode);
+$('select-delete-btn').addEventListener('click', () => {
+  if (!selectedIds.size) return;
+  const n = selectedIds.size;
+  if (!confirm(`Remove ${n} message${n>1?'s':''}? Your own messages will be unsent for everyone; others' messages will only be removed from your view.`)) return;
+  for (const id of selectedIds) {
+    const msg = allMessages.get(id);
+    if (!msg) continue;
+    const isOwn = msg.user === myName;
+    addToRecentlyDeleted({ ...msg, wasGlobalUnsend: isOwn });
+    if (isOwn) socket.emit('delete-msg', { id });
+  }
+  exitSelectMode();
+  rerenderAll();
+});
+
+$('messages').addEventListener('click', e => {
+  if (!selectMode) return;
+  const wrap = e.target.closest('.bubble-wrap');
+  if (!wrap || !wrap.dataset.msgId) return;
+  const id = wrap.dataset.msgId;
+  if (selectedIds.has(id)) { selectedIds.delete(id); wrap.classList.remove('selected'); }
+  else { selectedIds.add(id); wrap.classList.add('selected'); }
+  updateSelectBar();
+});
+
+/* ── more menu (header "..." button) ── */
+$('more-btn').addEventListener('click', e => {
+  e.stopPropagation();
+  $('more-menu').classList.toggle('open');
+});
+document.addEventListener('click', e => {
+  if (!$('more-menu').contains(e.target) && e.target !== $('more-btn') && !$('more-btn').contains(e.target)) {
+    $('more-menu').classList.remove('open');
+  }
+});
+
+/* ════════════════════════════════════════════════
+   RECENTLY DELETED screen
+════════════════════════════════════════════════ */
+function openRecentlyDeleted() {
+  $('more-menu').classList.remove('open');
+  renderRecentlyDeletedList();
+  $('recently-deleted-screen').classList.remove('hidden');
+}
+function closeRecentlyDeleted() {
+  $('recently-deleted-screen').classList.add('hidden');
+}
+$('recently-deleted-btn').addEventListener('click', openRecentlyDeleted);
+$('rd-back-btn').addEventListener('click', closeRecentlyDeleted);
+
+function renderRecentlyDeletedList() {
+  const list = $('recently-deleted-list');
+  const entries = getRecentlyDeleted();
+  list.innerHTML = '';
+  if (!entries.length) {
+    list.innerHTML = '<div class="rd-empty">Nothing here right now.</div>';
+    return;
+  }
+  entries.forEach(entry => {
+    const row = document.createElement('div');
+    row.className = 'rd-row';
+    const info = document.createElement('div');
+    info.className = 'rd-info';
+    const who = document.createElement('div');
+    who.className = 'rd-who';
+    who.textContent = entry.user === myName ? 'You' : entry.user;
+    const snippet = document.createElement('div');
+    snippet.className = 'rd-snippet';
+    snippet.textContent = entry.image && !entry.text ? '📷 Image' : (entry.text || '(empty message)');
+    const when = document.createElement('div');
+    when.className = 'rd-when';
+    when.textContent = `Deleted ${timeAgo(entry.deletedAt)}`;
+    info.appendChild(who); info.appendChild(snippet); info.appendChild(when);
+
+    const actions = document.createElement('div');
+    actions.className = 'rd-actions';
+    const restoreBtn = document.createElement('button');
+    restoreBtn.className = 'rd-btn rd-restore'; restoreBtn.innerHTML = svgIcon('restore') + '<span>Restore</span>';
+    restoreBtn.addEventListener('click', () => restoreMessage(entry));
+    const permBtn = document.createElement('button');
+    permBtn.className = 'rd-btn rd-perm'; permBtn.innerHTML = svgIcon('trash') + '<span>Delete</span>';
+    permBtn.addEventListener('click', () => {
+      if (confirm('Permanently delete this from Recently Deleted? This cannot be undone.')) {
+        removeFromRecentlyDeleted(entry.id);
+        renderRecentlyDeletedList();
+      }
+    });
+    actions.appendChild(restoreBtn); actions.appendChild(permBtn);
+
+    row.appendChild(info); row.appendChild(actions);
+    list.appendChild(row);
+  });
+}
+
+function restoreMessage(entry) {
+  removeFromRecentlyDeleted(entry.id);
+  if (entry.wasGlobalUnsend) {
+    // original was actually unsent server-side and is gone for good —
+    // the only way "back" is to resend the content as a new message.
+    socket.emit('message', { text: entry.text || '', image: entry.image || null });
+  } else {
+    rerenderAll();
+  }
+  renderRecentlyDeletedList();
+}
 
 function startReply(msg) {
   replyTarget = msg;
@@ -338,9 +539,14 @@ function startEdit(msg) {
 }
 $('edit-bar-close').addEventListener('click', () => { editTarget = null; $('edit-bar').classList.remove('open'); $('msg-input').value=''; });
 
-/* ── message rendering ── */
-function addMessage(data, isOwn, fromHistory) {
-  removeTypingRow();
+/* ════════════════════════════════════════════════
+   MESSAGE RENDERING
+   buildMessageDOM = pure DOM construction (reused by
+   live append AND full rebuilds for hide/restore/select).
+   addMessage = live wrapper with side effects (sound,
+   scroll, unread badge, read receipts).
+════════════════════════════════════════════════ */
+function buildMessageDOM(data, isOwn, fromHistory) {
   maybeDateDivider(data.ts || Date.now());
   const box = $('messages');
   const ts = data.ts || Date.now(), user = data.user;
@@ -372,6 +578,10 @@ function addMessage(data, isOwn, fromHistory) {
   const bubbleWrap = document.createElement('div');
   bubbleWrap.className = 'bubble-wrap';
   bubbleWrap.dataset.msgId = data.id || '';
+  if (selectMode && selectedIds.has(data.id)) bubbleWrap.classList.add('selected');
+
+  const selectCircle = document.createElement('div');
+  selectCircle.className = 'select-circle';
 
   const bubble = document.createElement('div');
   bubble.className = 'bubble' + (fromHistory ? '' : ' pop') + (data.deleted ? ' deleted' : '');
@@ -399,12 +609,12 @@ function addMessage(data, isOwn, fromHistory) {
       bubble.appendChild(img);
     }
   }
-  bubble.addEventListener('dblclick', () => openEmojiPicker(data.id, bubbleWrap));
+  bubble.addEventListener('dblclick', () => { if (!selectMode) openEmojiPicker(data.id, bubbleWrap); });
   attachTapToggle(bubble, group);
 
-  if (isOwn) bubbleWrap.appendChild(buildBubbleActions(data, true));
+  if (isOwn) { bubbleWrap.appendChild(selectCircle); bubbleWrap.appendChild(buildBubbleActions(data, true)); }
   bubbleWrap.appendChild(bubble);
-  if (!isOwn) bubbleWrap.appendChild(buildBubbleActions(data, false));
+  if (!isOwn) { bubbleWrap.appendChild(buildBubbleActions(data, false)); bubbleWrap.appendChild(selectCircle); }
   stack.appendChild(bubbleWrap);
 
   if (!data.deleted) {
@@ -428,7 +638,12 @@ function addMessage(data, isOwn, fromHistory) {
 
   updatePositions(stack);
   lastGroupEl = group; lastGroupUser = user; lastGroupTime = ts;
+}
 
+function addMessage(data, isOwn, fromHistory) {
+  removeTypingRow();
+  buildMessageDOM(data, isOwn, fromHistory);
+  const box = $('messages');
   const atBottom = isNearBottom();
   if (isOwn || atBottom || fromHistory) { box.scrollTop = box.scrollHeight; }
   else { bumpUnread(); }
@@ -436,8 +651,26 @@ function addMessage(data, isOwn, fromHistory) {
   if (!isOwn && data.id && !data.deleted) socket.emit('seen', { id: data.id });
   if (!isOwn && !fromHistory) {
     chime();
-    if (notifOn && document.hidden) notify(user, data.text || 'Sent an image');
+    if (notifOn && document.hidden) notify(data.user, data.text || 'Sent an image');
   }
+}
+
+/* Full rebuild — used after hide/restore/bulk-delete so the
+   visible list always reflects allMessages minus hidden ids,
+   in correct chronological order. */
+function rerenderAll() {
+  const box = $('messages');
+  const wasAtBottom = isNearBottom();
+  box.innerHTML = '';
+  lastGroupEl = null; lastGroupUser = null; lastDateKey = '';
+  const hidden = getHiddenIds();
+  const sorted = [...allMessages.values()].sort((a, b) => a.ts - b.ts);
+  if (hasMoreHistory) renderLoadMoreRow();
+  sorted.forEach(m => {
+    if (hidden.has(m.id)) return;
+    buildMessageDOM(m, m.user === myName, true);
+  });
+  if (wasAtBottom) box.scrollTop = box.scrollHeight;
 }
 
 function addSystem(text) {
@@ -644,7 +877,11 @@ function hideReconnectBanner() { const b = document.getElementById('reconnect-ba
 socket.on('history', msgs => {
   $('messages').innerHTML = '';
   lastGroupEl = null; lastGroupUser = null; lastDateKey = '';
-  msgs.forEach(m => addMessage(m, m.user === myName, true));
+  const hidden = getHiddenIds();
+  msgs.forEach(m => {
+    allMessages.set(m.id, m);
+    if (!hidden.has(m.id)) addMessage(m, m.user === myName, true);
+  });
   oldestTs = msgs.length ? msgs[0].ts : null;
   $('messages').scrollTop = $('messages').scrollHeight;
 });
@@ -653,7 +890,11 @@ socket.on('more-history', ({ msgs, hasMore }) => {
   const box = $('messages');
   const prevHeight = box.scrollHeight;
   lastGroupEl = null; lastGroupUser = null;
-  msgs.forEach(m => addMessage(m, m.user === myName, true));
+  const hidden = getHiddenIds();
+  msgs.forEach(m => {
+    allMessages.set(m.id, m);
+    if (!hidden.has(m.id)) addMessage(m, m.user === myName, true);
+  });
   hasMoreHistory = hasMore;
   oldestTs = msgs.length ? msgs[0].ts : oldestTs;
   renderLoadMoreRow();
@@ -661,6 +902,8 @@ socket.on('more-history', ({ msgs, hasMore }) => {
 });
 
 socket.on('message', data => {
+  allMessages.set(data.id, data);
+  if (getHiddenIds().has(data.id)) return;
   const isOwn = data.socketId === socket.id;
   addMessage(data, isOwn, false);
   if (!isOwn) {
@@ -669,6 +912,8 @@ socket.on('message', data => {
   }
 });
 socket.on('msg-edited', ({ id, text }) => {
+  const cached = allMessages.get(id);
+  if (cached) { cached.text = text; cached.edited = true; }
   const bubble = document.querySelector(`.bubble[data-id="${id}"]`);
   if (!bubble) return;
   const firstDiv = bubble.querySelector(':scope > div');
@@ -678,6 +923,8 @@ socket.on('msg-edited', ({ id, text }) => {
   if (ts && !ts.textContent.includes('edited')) ts.textContent += ' · edited';
 });
 socket.on('msg-deleted', ({ id }) => {
+  const cached = allMessages.get(id);
+  if (cached) { cached.deleted = true; cached.text = ''; cached.image = null; }
   const bubble = document.querySelector(`.bubble[data-id="${id}"]`);
   if (!bubble) return;
   const isOwn = bubble.closest('.msg-group')?.classList.contains('own');
@@ -694,6 +941,8 @@ socket.on('msg-deleted', ({ id }) => {
   }
 });
 socket.on('reaction-update', ({ msgId, reactions }) => {
+  const cached = allMessages.get(msgId);
+  if (cached) cached.reactions = reactions;
   const row = document.querySelector(`.reactions-row[data-msg-id="${msgId}"]`);
   if (!row) return;
   const fresh = renderReactions(msgId, reactions);
