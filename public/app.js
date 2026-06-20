@@ -125,6 +125,12 @@ function fileToResizedDataUrl(file, maxDim, quality) {
 }
 
 /* ── login ── */
+let clientId = localStorage.getItem('gc_client_id');
+if (!clientId) {
+  clientId = (window.crypto?.randomUUID?.() || (Date.now() + '_' + Math.random().toString(36).slice(2)));
+  localStorage.setItem('gc_client_id', clientId);
+}
+
 const savedName = localStorage.getItem('gc_name');
 if (savedName) $('name-input').value = savedName;
 
@@ -143,7 +149,7 @@ function joinChat() {
   $('join-btn').disabled = true;
   myName = name;
   localStorage.setItem('gc_name', name);
-  socket.emit('join', { name });
+  socket.emit('join', { name, clientId });
 }
 $('join-btn').addEventListener('click', joinChat);
 $('name-input').addEventListener('keydown', e => { if (e.key==='Enter') joinChat(); });
@@ -237,6 +243,7 @@ function svgIcon(name) {
 function buildBubbleActions(msg, isOwn) {
   const wrap = document.createElement('div');
   wrap.className = 'bubble-actions';
+  if (msg.deleted) return wrap; // no actions on a deleted message
   const reactBtn = document.createElement('button');
   reactBtn.innerHTML = svgIcon('react'); reactBtn.title = 'React';
   reactBtn.addEventListener('click', e => { e.stopPropagation(); openEmojiPicker(msg.id, wrap.parentElement); });
@@ -404,17 +411,19 @@ function addMessage(data, isOwn, fromHistory) {
     stack.appendChild(rxRow);
   }
 
-  const tsEl = document.createElement('div'); tsEl.className = 'ts';
-  const tsText = document.createElement('span');
-  tsText.textContent = fmtTime(ts) + (data.edited ? ' · edited' : '');
-  tsEl.appendChild(tsText);
-  if (isOwn && !data.deleted) {
-    const rc = document.createElement('span');
-    rc.className = 'receipt'; rc.dataset.id = data.id || ''; rc.textContent = 'Read';
-    if (data.seenBy && data.seenBy.length) rc.classList.add('seen');
-    tsEl.appendChild(rc);
+  if (!data.deleted) {
+    const tsEl = document.createElement('div'); tsEl.className = 'ts';
+    const tsText = document.createElement('span');
+    tsText.textContent = fmtTime(ts) + (data.edited ? ' · edited' : '');
+    tsEl.appendChild(tsText);
+    if (isOwn) {
+      const rc = document.createElement('span');
+      rc.className = 'receipt'; rc.dataset.id = data.id || ''; rc.textContent = 'Read';
+      if (data.seenBy && data.seenBy.length) rc.classList.add('seen');
+      tsEl.appendChild(rc);
+    }
+    stack.appendChild(tsEl);
   }
-  stack.appendChild(tsEl);
 
   updatePositions(stack);
   lastGroupEl = group; lastGroupUser = user; lastGroupTime = ts;
@@ -672,6 +681,14 @@ socket.on('msg-deleted', ({ id }) => {
   if (!bubble) return;
   bubble.classList.add('deleted');
   bubble.innerHTML = 'Message deleted';
+  const wrap = bubble.closest('.bubble-wrap');
+  const stack = wrap?.parentElement;
+  wrap?.querySelector('.bubble-actions')?.remove();
+  stack?.querySelector(`.reactions-row[data-msg-id="${id}"]`)?.remove();
+  if (stack) {
+    const allWraps = [...stack.querySelectorAll('.bubble-wrap')];
+    if (allWraps[allWraps.length - 1] === wrap) stack.querySelector(':scope > .ts')?.remove();
+  }
 });
 socket.on('reaction-update', ({ msgId, reactions }) => {
   const row = document.querySelector(`.reactions-row[data-msg-id="${msgId}"]`);
@@ -703,5 +720,5 @@ socket.on('user-count', n => { $('online-count').textContent = `${n} online`; })
 
 socket.on('disconnect', () => { if (hasJoinedOnce) showReconnectBanner(); });
 socket.on('connect', () => {
-  if (hasJoinedOnce && myName) socket.emit('join', { name: myName });
+  if (hasJoinedOnce && myName) socket.emit('join', { name: myName, clientId });
 });
