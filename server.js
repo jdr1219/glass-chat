@@ -58,8 +58,18 @@ const MAX_IMG_LEN = 600000; // ~450KB base64
 const RATE_LIMIT  = 8;
 
 const history = loadHistory();
-const users      = {};   // socket.id -> name
+const users      = {};   // socket.id -> { name, clientId }
 const rateLimits = {};
+
+function evictStaleSocket(clientId, exceptSocketId) {
+  for (const [sid, u] of Object.entries(users)) {
+    if (u.clientId === clientId && sid !== exceptSocketId) {
+      const oldSocket = io.sockets.sockets.get(sid);
+      if (oldSocket) oldSocket.disconnect(true);
+      delete users[sid]; delete rateLimits[sid];
+    }
+  }
+}
 
 function sanitize(str = "", max = MAX_MSG_LEN) {
   return String(str).replace(/</g, "&lt;").replace(/>/g, "&gt;").trim().slice(0, max);
@@ -104,13 +114,18 @@ async function fetchPreview(url) {
 io.on("connection", socket => {
   log.info("connect", { id: socket.id });
 
-  socket.on("join", ({ name } = {}) => {
+  socket.on("join", ({ name, clientId } = {}) => {
     const username = sanitize(name, 24);
+    const cid = sanitize(clientId, 64) || null;
     if (!username) return socket.emit("error-msg", "Invalid name");
-    const taken = Object.values(users).some(n => n.toLowerCase() === username.toLowerCase());
-    if (taken) return socket.emit("name-taken");
 
-    users[socket.id] = username;
+    const conflict = Object.entries(users).find(
+      ([sid, u]) => u.name.toLowerCase() === username.toLowerCase() && u.clientId !== cid
+    );
+    if (conflict) return socket.emit("name-taken");
+
+    if (cid) evictStaleSocket(cid, socket.id); // drop any earlier session from this same browser
+    users[socket.id] = { name: username, clientId: cid };
     log.info("join", { username });
 
     socket.emit("join-success");
@@ -121,7 +136,7 @@ io.on("connection", socket => {
   });
 
   socket.on("load-more", ({ before } = {}) => {
-    const username = users[socket.id]; if (!username) return;
+    const username = users[socket.id]?.name; if (!username) return;
     const idx = history.findIndex(m => m.ts === before);
     const end = idx === -1 ? history.length : idx;
     const start = Math.max(0, end - PAGE_SIZE);
@@ -129,7 +144,7 @@ io.on("connection", socket => {
   });
 
   socket.on("message", async data => {
-    const username = users[socket.id]; if (!username) return;
+    const username = users[socket.id]?.name; if (!username) return;
     if (isRateLimited(socket.id)) return socket.emit("error-msg", "Slow down a little");
     const text = sanitize(data.text || "");
     const image = typeof data.image === "string" && data.image.length < MAX_IMG_LEN ? data.image : null;
@@ -158,7 +173,7 @@ io.on("connection", socket => {
   });
 
   socket.on("edit-msg", ({ id, text }) => {
-    const username = users[socket.id]; if (!username) return;
+    const username = users[socket.id]?.name; if (!username) return;
     const msg = history.find(m => m.id === id && m.user === username);
     if (!msg) return;
     msg.text = sanitize(text); msg.edited = true;
@@ -167,7 +182,7 @@ io.on("connection", socket => {
   });
 
   socket.on("delete-msg", ({ id }) => {
-    const username = users[socket.id]; if (!username) return;
+    const username = users[socket.id]?.name; if (!username) return;
     const msg = history.find(m => m.id === id && m.user === username);
     if (!msg) return;
     msg.deleted = true; msg.text = ""; msg.image = null;
@@ -176,7 +191,7 @@ io.on("connection", socket => {
   });
 
   socket.on("react", ({ msgId, emoji }) => {
-    const username = users[socket.id]; if (!username || !msgId || !emoji) return;
+    const username = users[socket.id]?.name; if (!username || !msgId || !emoji) return;
     const msg = history.find(m => m.id === msgId);
     if (!msg) return;
     if (!msg.reactionsRaw[emoji]) msg.reactionsRaw[emoji] = new Set();
@@ -189,7 +204,7 @@ io.on("connection", socket => {
   });
 
   socket.on("seen", ({ id }) => {
-    const username = users[socket.id]; if (!username) return;
+    const username = users[socket.id]?.name; if (!username) return;
     const msg = history.find(m => m.id === id);
     if (msg && !msg.seenBy.includes(username)) {
       msg.seenBy.push(username);
@@ -198,12 +213,12 @@ io.on("connection", socket => {
   });
 
   socket.on("typing", () => {
-    const username = users[socket.id];
+    const username = users[socket.id]?.name;
     if (username) socket.broadcast.emit("typing", username);
   });
 
   socket.on("disconnect", () => {
-    const username = users[socket.id];
+    const username = users[socket.id]?.name;
     delete users[socket.id]; delete rateLimits[socket.id];
     if (username) {
       log.info("leave", { username });
