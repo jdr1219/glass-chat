@@ -16,7 +16,8 @@
   --ease-in: cubic-bezier(.4, 0, 1, 1);
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; overflow: hidden; min-height: 100vh; background: #9fd8f0; }
+html { height: 100%; overflow: hidden; }
+body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; overflow: hidden; height: 100%; position: fixed; width: 100%; background: #9fd8f0; }
 #bg { position: fixed; inset: 0; z-index: 0; }
 #pcanvas { position: fixed; inset: 0; z-index: 999; pointer-events: none; }
 .screen { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 16px; }
@@ -140,10 +141,18 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; over
 .reply-quote b { color:var(--ink); }
 
 /* ── Minimalist bubble actions: no chrome until hover, just the icon ── */
-.bubble-actions { display:flex; gap:2px; opacity:0; transition:opacity .15s; }
-.msg-group:hover .bubble-actions { opacity:1; }
+/* ── Minimalist bubble actions: hover reveal on desktop, long-press reveal on touch ── */
+.bubble-actions { display:flex; gap:2px; opacity:0; transform:scale(.85) translateY(3px); pointer-events:none; transition:opacity .18s var(--ease),transform .18s var(--ease); }
+@media (hover: hover) and (pointer: fine) {
+  .msg-group:hover .bubble-actions { opacity:1; transform:scale(1) translateY(0); pointer-events:auto; }
+}
+.msg-group.actions-visible .bubble-actions { opacity:1; transform:scale(1) translateY(0); pointer-events:auto; animation: actionsPop .32s var(--ease) both; }
+@keyframes actionsPop { from{opacity:0;transform:scale(.7) translateY(5px);} 60%{transform:scale(1.06) translateY(-1px);} to{opacity:1;transform:scale(1) translateY(0);} }
 .bubble-actions button { width:24px; height:24px; border-radius:8px; border:none; background:transparent; cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--ink-soft); opacity:.55; transition:opacity .15s,background .15s,color .15s; }
 .bubble-actions button:hover { opacity:1; background:rgba(63,169,224,.15); color:var(--blue-deep); }
+
+.bubble.pressing { transform: scale(.95); }
+.msg-group.actions-visible .bubble { box-shadow: 0 0 0 2.5px rgba(63,169,224,.35), 0 4px 16px rgba(15,40,60,.18) !important; }
 .bubble-actions svg { width:13px; height:13px; }
 
 .reactions-row { display:flex; gap:4px; flex-wrap:wrap; margin-top:3px; padding:0 5px; }
@@ -225,6 +234,12 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; over
 #reconnect-banner { position:absolute; top:0; left:0; right:0; z-index:8; background:rgba(31,79,122,.90); color:#fff; text-align:center; font-size:12px; font-weight:600; padding:7px; backdrop-filter:blur(10px); }
 
 @media (max-width: 480px) {
-  .chat-card { height: 100vh; border-radius: 0; }
+  #chat-screen.screen { padding: 0; }
+  .chat-card { height: 100%; width: 100%; border-radius: 0; }
   .login-card { border-radius: 24px; }
+  .chat-header { padding-top: max(13px, env(safe-area-inset-top)); }
+  .input-area { padding-bottom: max(18px, env(safe-area-inset-bottom)); }
+  .bubble-stack { max-width: 86%; }
+  .avatar { width: 26px; height: 26px; font-size: 11px; }
+  .messages { padding-left: 12px; padding-right: 12px; }
 }
