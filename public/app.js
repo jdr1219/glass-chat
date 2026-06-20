@@ -376,10 +376,11 @@ function addMessage(data, isOwn, fromHistory) {
   const bubble = document.createElement('div');
   bubble.className = 'bubble' + (fromHistory ? '' : ' pop') + (data.deleted ? ' deleted' : '');
   bubble.dataset.id = data.id || '';
+  bubble.dataset.user = user;
   if (data.text && myName && data.text.toLowerCase().includes('@'+myName.toLowerCase()) && !isOwn) bubble.classList.add('mentioned');
 
   if (data.deleted) {
-    bubble.textContent = 'Message deleted';
+    bubble.textContent = isOwn ? 'You unsent a message' : `${user} unsent a message`;
   } else {
     if (data.replyTo) {
       const q = document.createElement('div'); q.className = 'reply-quote';
@@ -679,8 +680,10 @@ socket.on('msg-edited', ({ id, text }) => {
 socket.on('msg-deleted', ({ id }) => {
   const bubble = document.querySelector(`.bubble[data-id="${id}"]`);
   if (!bubble) return;
+  const isOwn = bubble.closest('.msg-group')?.classList.contains('own');
+  const user = bubble.dataset.user || '';
   bubble.classList.add('deleted');
-  bubble.innerHTML = 'Message deleted';
+  bubble.innerHTML = isOwn ? 'You unsent a message' : `${escapeHtml(user)} unsent a message`;
   const wrap = bubble.closest('.bubble-wrap');
   const stack = wrap?.parentElement;
   wrap?.querySelector('.bubble-actions')?.remove();
