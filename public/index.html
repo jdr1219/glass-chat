@@ -120,14 +120,6 @@
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/vanta@0.5.24/dist/vanta.fog.min.js"></script>
-<script>
-VANTA.FOG({el:'#bg',mouseControls:true,touchControls:true,gyroControls:false,minHeight:200,minWidth:200,
-  highlightColor:0x48b8e3,midtoneColor:0xa3cfff,lowlightColor:0x28b1a6,baseColor:0xffffff});
-</script>
-<script src="/socket.io/socket.io.js"></script>
-<script src="app.js"></script>
 <div id="recently-deleted-screen" class="screen hidden">
   <div class="glass chat-card rd-card">
     <header class="chat-header">
@@ -141,6 +133,15 @@ VANTA.FOG({el:'#bg',mouseControls:true,touchControls:true,gyroControls:false,min
     <div class="rd-list" id="recently-deleted-list"></div>
   </div>
 </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vanta@0.5.24/dist/vanta.fog.min.js"></script>
+<script>
+VANTA.FOG({el:'#bg',mouseControls:true,touchControls:true,gyroControls:false,minHeight:200,minWidth:200,
+  highlightColor:0x48b8e3,midtoneColor:0xa3cfff,lowlightColor:0x28b1a6,baseColor:0xffffff});
+</script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="app.js"></script>
 
 </body>
 </html>
