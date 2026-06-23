@@ -739,7 +739,7 @@ $('msg-input').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.sh
 async function attachImage(file) {
   if (!file || !file.type.startsWith('image/')) return;
   try {
-    const dataUrl = await fileToResizedDataUrl(file, 640, 0.75);
+    const dataUrl = await fileToResizedDataUrl(file, 1000, 0.78);
     pendingImage = dataUrl;
     const bar = $('img-preview-bar');
     bar.innerHTML = '';
