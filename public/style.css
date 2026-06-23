@@ -229,7 +229,7 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; over
 @keyframes rippleExpand { from{width:0;height:0;opacity:.8;} to{width:160px;height:160px;margin-left:-80px;margin-top:-80px;opacity:0;} }
 
 .lightbox { position:fixed; inset:0; background:rgba(10,20,30,.75); z-index:1000; display:flex; align-items:center; justify-content:center; animation: fadeUp .2s var(--ease) both; cursor:zoom-out; }
-.lightbox img { max-width:96vw; max-height:96vh; border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,.5); }
+.lightbox img { width:92vw; height:92vh; max-width:92vw; max-height:92vh; object-fit:contain; border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,.5); }
 
 #reconnect-banner { position:absolute; top:0; left:0; right:0; z-index:8; background:rgba(31,79,122,.90); color:#fff; text-align:center; font-size:12px; font-weight:600; padding:7px; backdrop-filter:blur(10px); }
 
