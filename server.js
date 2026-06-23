@@ -54,7 +54,7 @@ function saveDebounced() {
 const MAX_HISTORY = 300;
 const PAGE_SIZE   = 30;
 const MAX_MSG_LEN = 2000;
-const MAX_IMG_LEN = 600000; // ~450KB base64
+const MAX_IMG_LEN = 950000; // ~700KB base64, enough headroom for 1000px-wide JPEGs
 const RATE_LIMIT  = 8;
 
 const history = loadHistory();
