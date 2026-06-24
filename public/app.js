@@ -599,6 +599,7 @@ function buildMessageDOM(data, isOwn, fromHistory) {
     }
     if (data.text) {
       const textEl = document.createElement('div');
+      textEl.className = 'bubble-text';
       textEl.innerHTML = renderRich(data.text);
       bubble.appendChild(textEl);
     }
@@ -766,8 +767,10 @@ chatCard.addEventListener('drop', e => {
 
 function openLightbox(src) {
   const lb = document.createElement('div'); lb.className = 'lightbox';
+  const frame = document.createElement('div'); frame.className = 'lightbox-frame';
   const img = document.createElement('img'); img.src = src;
-  lb.appendChild(img);
+  frame.appendChild(img);
+  lb.appendChild(frame);
   lb.addEventListener('click', () => lb.remove());
   document.body.appendChild(lb);
 }
