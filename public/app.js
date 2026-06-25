@@ -1,5 +1,27 @@
 /* ════════ Glass Chat — client ════════ */
 const socket = io();
+
+/* ── Liquid Glass: cursor-reactive specular highlight ──
+   Tracks pointer position over each .glass surface and updates
+   --mx/--my so the highlight follows the cursor, approximating
+   how real glass/liquid concentrates light toward a viewing angle. */
+function initLiquidGlass() {
+  document.querySelectorAll('.glass').forEach(el => {
+    el.addEventListener('pointermove', e => {
+      const r = el.getBoundingClientRect();
+      const x = ((e.clientX - r.left) / r.width) * 100;
+      const y = ((e.clientY - r.top) / r.height) * 100;
+      el.style.setProperty('--mx', x + '%');
+      el.style.setProperty('--my', y + '%');
+      el.style.setProperty('--glow', '1');
+    });
+    el.addEventListener('pointerleave', () => {
+      el.style.setProperty('--glow', '0');
+    });
+  });
+}
+initLiquidGlass();
+
 let myName = '';
 let lastGroupEl = null, lastGroupUser = null, lastGroupTime = 0;
 let replyTarget = null, editTarget = null;
