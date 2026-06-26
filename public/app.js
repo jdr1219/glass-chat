@@ -46,7 +46,7 @@ function initGlassRipples() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 
     const scene = new THREE.Scene();
-    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -1, 1);
 
     const uniforms = {
       uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
@@ -102,19 +102,19 @@ function initGlassRipples() {
             float dist = length(toPixel);
             vec2 dir = dist > 0.001 ? toPixel / dist : vec2(0.0);
             float phase = dist * 0.065 - age * 6.2;
-            float decay = exp(-age * 1.3) * exp(-dist * 0.012);
-            float dwave = cos(phase) * 0.065 * decay;
+            float decay = exp(-age * 0.9) * exp(-dist * 0.006);
+            float dwave = cos(phase) * 0.22 * decay;
             grad += dir * dwave;
           }
 
           float tilt = length(grad);
           vec3 lightDir = normalize(vec3(-0.35, 0.55, 1.0));
-          vec3 normal = normalize(vec3(-grad * 3.2, 1.0));
-          float spec = pow(max(dot(normal, lightDir), 0.0), 24.0) * 2.6;
-          float rim = smoothstep(0.0, 0.5, tilt) * 0.45;
+          vec3 normal = normalize(vec3(-grad * 2.0, 1.0));
+          float spec = pow(max(dot(normal, lightDir), 0.0), 9.0) * 2.2;
+          float rim = smoothstep(0.0, 0.35, tilt) * 0.9;
 
           float alpha = clamp(spec + rim, 0.0, 1.0) * edgeFade;
-          gl_FragColor = vec4(vec3(1.0), alpha * 0.85);
+          gl_FragColor = vec4(vec3(1.0), alpha);
         }
       `,
     });
@@ -170,6 +170,7 @@ function initGlassRipples() {
     document.querySelectorAll('.glass').forEach(el => {
       el.addEventListener('pointerdown', e => addGlassRipple(e.clientX, e.clientY));
     });
+    console.log('✅ Liquid glass ripples initialized');
   } catch (e) {
     console.warn('Liquid glass ripples unavailable:', e);
   }
