@@ -168,7 +168,10 @@ function initGlassRipples() {
     });
 
     document.querySelectorAll('.glass').forEach(el => {
-      el.addEventListener('pointerdown', e => addGlassRipple(e.clientX, e.clientY));
+      el.addEventListener('pointerdown', e => {
+        if (e.target.closest('#send-btn')) return; // already triggers its own ripple below
+        addGlassRipple(e.clientX, e.clientY);
+      });
     });
     console.log('✅ Liquid glass ripples initialized');
   } catch (e) {
