@@ -143,13 +143,13 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; over
 .date-divider { text-align:center; margin:14px 0 16px; position:relative; }
 .date-divider span { font-size:11px; font-weight:700; color:var(--ink-soft); background:rgba(255,255,255,0.30); padding:4px 14px; border-radius:12px; }
 
-.msg-group { display:flex; align-items:flex-end; gap:9px; margin-bottom:12px; will-change:transform,opacity; animation: groupIn .38s var(--ease) both; position:relative; }
+.msg-group { display:flex; align-items:flex-start; gap:9px; margin-bottom:12px; will-change:transform,opacity; animation: groupIn .38s var(--ease) both; position:relative; }
 @keyframes groupIn { from{opacity:0;transform:translateY(10px);} to{opacity:1;transform:translateY(0);} }
 .msg-group.own { flex-direction:row-reverse; }
 .msg-group.other { flex-direction:row; }
 .msg-group.tight { margin-bottom:3px; animation:none; }
 
-.avatar { width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12.5px; font-weight:700; color:#fff; flex-shrink:0; box-shadow:0 2px 8px rgba(15,40,60,.25); }
+.avatar { width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12.5px; font-weight:700; color:#fff; flex-shrink:0; box-shadow:0 2px 8px rgba(15,40,60,.25); margin-top:17px; }
 .msg-group.own .avatar { display:none; }
 
 .bubble-stack { display:flex; flex-direction:column; gap:3px; max-width:84%; position:relative; }
