@@ -22,163 +22,6 @@ function initLiquidGlass() {
 }
 initLiquidGlass();
 
-/* ════════════════════════════════════════════════
-   LIQUID GLASS RIPPLES — real WebGL shader.
-   A height field of decaying ripple waves is simulated per-pixel;
-   the gradient of that height field approximates a surface normal,
-   which is lit with a fixed light direction to produce a moving
-   specular highlight — i.e. an actual simulated liquid surface
-   catching light, not just a CSS gradient trick. Masked per-pixel
-   to each .glass element's exact rounded-rect shape so it never
-   bleeds outside the card. Wrapped in try/catch — if WebGL is
-   unavailable for any reason, the rest of the app is unaffected. */
-function initGlassRipples() {
-  try {
-    const canvas = document.getElementById('glass-ripple-canvas');
-    if (!canvas || !window.THREE) return;
-    const THREE = window.THREE;
-    const MAX_RIPPLES = 10;
-    const MAX_RECTS = 4;
-
-    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-    if (!renderer.getContext()) return;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setSize(window.innerWidth, window.innerHeight);
-
-    const scene = new THREE.Scene();
-    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -1, 1);
-
-    const uniforms = {
-      uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
-      uTime: { value: 0 },
-      uRippleCount: { value: 0 },
-      uRippleData: { value: new Float32Array(MAX_RIPPLES * 3) },
-      uRectCount: { value: 0 },
-      uRectData: { value: new Float32Array(MAX_RECTS * 5) },
-    };
-
-    const material = new THREE.ShaderMaterial({
-      uniforms,
-      transparent: true,
-      depthTest: false,
-      vertexShader: `void main(){ gl_Position = vec4(position,1.0); }`,
-      fragmentShader: `
-        precision highp float;
-        uniform vec2 uResolution;
-        uniform float uTime;
-        uniform int uRippleCount;
-        uniform float uRippleData[${MAX_RIPPLES * 3}];
-        uniform int uRectCount;
-        uniform float uRectData[${MAX_RECTS * 5}];
-
-        float roundedBoxSDF(vec2 p, vec2 halfSize, float radius) {
-          vec2 q = abs(p) - halfSize + radius;
-          return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - radius;
-        }
-
-        void main() {
-          vec2 px = vec2(gl_FragCoord.x, uResolution.y - gl_FragCoord.y);
-
-          float inside = 0.0;
-          float edgeFade = 0.0;
-          for (int i = 0; i < ${MAX_RECTS}; i++) {
-            if (i >= uRectCount) break;
-            vec2 c = vec2(uRectData[i*5+0], uRectData[i*5+1]);
-            vec2 halfSize = vec2(uRectData[i*5+2], uRectData[i*5+3]) * 0.5;
-            float radius = uRectData[i*5+4];
-            float d = roundedBoxSDF(px - c, halfSize, radius);
-            if (d < 0.0) { inside = 1.0; edgeFade = max(edgeFade, smoothstep(0.0, -10.0, d)); }
-          }
-          if (inside < 0.5) { gl_FragColor = vec4(0.0); return; }
-
-          vec2 grad = vec2(0.0);
-          for (int i = 0; i < ${MAX_RIPPLES}; i++) {
-            if (i >= uRippleCount) break;
-            vec2 origin = vec2(uRippleData[i*3+0], uRippleData[i*3+1]);
-            float startTime = uRippleData[i*3+2];
-            float age = uTime - startTime;
-            if (age < 0.0 || age > 2.4) continue;
-            vec2 toPixel = px - origin;
-            float dist = length(toPixel);
-            vec2 dir = dist > 0.001 ? toPixel / dist : vec2(0.0);
-            float phase = dist * 0.065 - age * 6.2;
-            float decay = exp(-age * 0.9) * exp(-dist * 0.006);
-            float dwave = cos(phase) * 0.22 * decay;
-            grad += dir * dwave;
-          }
-
-          float tilt = length(grad);
-          vec3 lightDir = normalize(vec3(-0.35, 0.55, 1.0));
-          vec3 normal = normalize(vec3(-grad * 2.0, 1.0));
-          float spec = pow(max(dot(normal, lightDir), 0.0), 9.0) * 2.2;
-          float rim = smoothstep(0.0, 0.35, tilt) * 0.9;
-
-          float alpha = clamp(spec + rim, 0.0, 1.0) * edgeFade;
-          gl_FragColor = vec4(vec3(1.0), alpha);
-        }
-      `,
-    });
-
-    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material));
-
-    let ripples = [];
-    const clock = new THREE.Clock();
-
-    function addGlassRipple(xPx, yPx) {
-      ripples.push({ x: xPx, y: yPx, time: clock.getElapsedTime() });
-      if (ripples.length > MAX_RIPPLES) ripples.shift();
-    }
-    window.__addGlassRipple = addGlassRipple; // exposed for send/receive hooks below
-
-    function updateRects() {
-      const els = document.querySelectorAll('.glass');
-      const data = uniforms.uRectData.value;
-      let count = 0;
-      els.forEach(el => {
-        if (count >= MAX_RECTS) return;
-        const r = el.getBoundingClientRect();
-        if (r.width === 0 || r.height === 0) return;
-        const radius = parseFloat(getComputedStyle(el).borderRadius) || 0;
-        data[count*5+0] = r.left + r.width / 2;
-        data[count*5+1] = r.top + r.height / 2;
-        data[count*5+2] = r.width;
-        data[count*5+3] = r.height;
-        data[count*5+4] = radius;
-        count++;
-      });
-      uniforms.uRectCount.value = count;
-    }
-
-    function tick() {
-      requestAnimationFrame(tick);
-      const now = clock.getElapsedTime();
-      uniforms.uTime.value = now;
-      ripples = ripples.filter(r => now - r.time < 2.4);
-      const data = uniforms.uRippleData.value;
-      ripples.forEach((r, i) => { data[i*3] = r.x; data[i*3+1] = r.y; data[i*3+2] = r.time; });
-      uniforms.uRippleCount.value = ripples.length;
-      updateRects();
-      renderer.render(scene, camera);
-    }
-    tick();
-
-    window.addEventListener('resize', () => {
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      uniforms.uResolution.value.set(window.innerWidth, window.innerHeight);
-    });
-
-    document.querySelectorAll('.glass').forEach(el => {
-      el.addEventListener('pointerdown', e => {
-        if (e.target.closest('#send-btn')) return; // already triggers its own ripple below
-        addGlassRipple(e.clientX, e.clientY);
-      });
-    });
-    console.log('✅ Liquid glass ripples initialized');
-  } catch (e) {
-    console.warn('Liquid glass ripples unavailable:', e);
-  }
-}
-initGlassRipples();
 
 let myName = '';
 let lastGroupEl = null, lastGroupUser = null, lastGroupTime = 0;
@@ -911,7 +754,6 @@ function sendMsg() {
   const r = btn.getBoundingClientRect();
   ps.burst(r.left + r.width/2, r.top + r.height/2, 'send');
   ripple(r.left + r.width/2, r.top + r.height/2);
-  window.__addGlassRipple?.(r.left + r.width/2, r.top + r.height/2);
   btn.classList.remove('fire'); void btn.offsetWidth; btn.classList.add('fire');
 }
 $('send-btn').addEventListener('click', sendMsg);
@@ -1093,7 +935,6 @@ socket.on('message', data => {
   if (!isOwn) {
     const r = $('messages').getBoundingClientRect();
     ps.burst(r.left + 60, r.bottom - 75, 'recv');
-    window.__addGlassRipple?.(r.left + 60, r.bottom - 75);
   }
 });
 socket.on('msg-edited', ({ id, text }) => {
