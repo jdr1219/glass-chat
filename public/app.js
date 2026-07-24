@@ -24,6 +24,9 @@ initLiquidGlass();
 
 
 let myName = '';
+let myAvatar = null;
+let pendingSetupAvatar = null;
+let pendingProfileMenuAvatar; // undefined = "no new upload chosen this time menu was opened"
 let lastGroupEl = null, lastGroupUser = null, lastGroupTime = 0;
 let replyTarget = null, editTarget = null;
 let typingTimers = {};
@@ -197,13 +200,68 @@ function hideMessageLocally(msg, alsoUnsend) {
   rerenderAll();
 }
 
-/* ── login ── */
-const savedName = localStorage.getItem('gc_name');
-if (savedName) $('name-input').value = savedName;
-
+/* ── login / profile setup ──
+   We recognize returning visitors by their public IP (server-side
+   /api/profile lookup) and skip the "type your name" screen entirely.
+   First-time visitors get a one-time welcome screen to set a name + photo. */
 function showFieldError(msg) { $('field-error').textContent = msg || ''; }
 
-function joinChat() {
+function updateHeaderProfile() {
+  $('header-username').textContent = myName || 'Glass Chat';
+  $('header-avatar').src = myAvatar || 'favicon-32.png';
+}
+
+function goStraightToChat() {
+  hasJoinedOnce = true;
+  $('login-screen').classList.add('hidden');
+  $('chat-screen').classList.remove('hidden');
+  updateHeaderProfile();
+  socket.emit('join', { name: myName, clientId, avatar: myAvatar });
+}
+
+function showWelcomeScreen() {
+  $('login-screen').classList.remove('hidden');
+  setTimeout(() => $('name-input').focus(), 50);
+}
+
+async function initProfile() {
+  try {
+    const res = await fetch('/api/profile');
+    const data = await res.json();
+    if (data.exists) {
+      myName = data.name;
+      myAvatar = data.avatar || null;
+      localStorage.setItem('gc_name', myName);
+      if (myAvatar) localStorage.setItem('gc_avatar', myAvatar); else localStorage.removeItem('gc_avatar');
+      goStraightToChat();
+      return;
+    }
+  } catch {}
+  // no saved profile for this IP (or the lookup failed) — fall back to
+  // any locally cached profile before asking the person to set one up
+  const cachedName = localStorage.getItem('gc_name');
+  if (cachedName) {
+    myName = cachedName;
+    myAvatar = localStorage.getItem('gc_avatar') || null;
+    goStraightToChat();
+  } else {
+    showWelcomeScreen();
+  }
+}
+initProfile();
+
+$('setup-avatar-btn').addEventListener('click', () => $('setup-avatar-upload').click());
+$('setup-avatar-upload').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const dataUrl = await fileToResizedDataUrl(file, 200, 0.85);
+    pendingSetupAvatar = dataUrl;
+    $('setup-avatar-preview').src = dataUrl;
+  } catch {}
+});
+
+async function joinChat() {
   const nameInp = $('name-input');
   const name = nameInp.value.trim();
   if (!name) {
@@ -215,8 +273,16 @@ function joinChat() {
   showFieldError('');
   $('join-btn').disabled = true;
   myName = name;
+  myAvatar = pendingSetupAvatar || null;
   localStorage.setItem('gc_name', name);
-  socket.emit('join', { name, clientId });
+  if (myAvatar) localStorage.setItem('gc_avatar', myAvatar); else localStorage.removeItem('gc_avatar');
+  try {
+    await fetch('/api/profile', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, avatar: myAvatar }),
+    });
+  } catch {}
+  socket.emit('join', { name, clientId, avatar: myAvatar });
 }
 $('join-btn').addEventListener('click', joinChat);
 $('name-input').addEventListener('keydown', e => { if (e.key==='Enter') joinChat(); });
@@ -226,11 +292,20 @@ socket.on('name-taken', () => {
   showFieldError('That name is already taken');
   $('name-input').classList.remove('shake'); void $('name-input').offsetWidth; $('name-input').classList.add('shake');
 });
-socket.on('error-msg', msg => showFieldError(msg));
+socket.on('error-msg', msg => {
+  if ($('profile-menu').classList.contains('open')) $('profile-menu-error').textContent = msg;
+  else showFieldError(msg);
+});
 
 socket.on('join-success', () => {
   $('join-btn').disabled = false;
-  if (!hasJoinedOnce) {
+  updateHeaderProfile();
+  if (!$('chat-screen').classList.contains('hidden')) {
+    // already showing chat (returning-profile flow went straight in)
+    hasJoinedOnce ? hideReconnectBanner() : ($('msg-input').focus());
+    hasJoinedOnce = true;
+  } else {
+    // first-time welcome/setup flow — animate the setup card away
     hasJoinedOnce = true;
     $('login-card').classList.add('leaving');
     setTimeout(() => {
@@ -238,9 +313,69 @@ socket.on('join-success', () => {
       $('chat-screen').classList.remove('hidden');
       $('msg-input').focus();
     }, 280);
-  } else {
-    hideReconnectBanner();
   }
+});
+
+/* ── settings dropdown: change display name / photo any time ── */
+$('profile-trigger').addEventListener('click', e => {
+  e.stopPropagation();
+  $('more-menu').classList.remove('open');
+  const menu = $('profile-menu');
+  const opening = !menu.classList.contains('open');
+  menu.classList.toggle('open');
+  if (opening) {
+    $('profile-menu-name-input').value = myName;
+    $('profile-menu-avatar-preview').src = myAvatar || 'apple-touch-icon.png';
+    $('profile-menu-error').textContent = '';
+    pendingProfileMenuAvatar = undefined;
+  }
+});
+document.addEventListener('click', e => {
+  if (!$('profile-menu').contains(e.target) && !$('profile-trigger').contains(e.target)) {
+    $('profile-menu').classList.remove('open');
+  }
+});
+$('profile-menu-avatar-btn').addEventListener('click', () => $('profile-menu-avatar-upload').click());
+$('profile-menu-avatar-upload').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const dataUrl = await fileToResizedDataUrl(file, 200, 0.85);
+    pendingProfileMenuAvatar = dataUrl;
+    $('profile-menu-avatar-preview').src = dataUrl;
+  } catch {}
+});
+$('profile-menu-save-btn').addEventListener('click', async () => {
+  const newName = $('profile-menu-name-input').value.trim();
+  if (!newName) { $('profile-menu-error').textContent = 'Enter a name'; return; }
+  $('profile-menu-error').textContent = '';
+  $('profile-menu-save-btn').disabled = true;
+  const payload = { name: newName };
+  if (pendingProfileMenuAvatar !== undefined) payload.avatar = pendingProfileMenuAvatar;
+  try {
+    const res = await fetch('/api/profile', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      $('profile-menu-error').textContent = data.error || 'Could not save';
+      $('profile-menu-save-btn').disabled = false;
+      return;
+    }
+    myName = data.name; myAvatar = data.avatar;
+    localStorage.setItem('gc_name', myName);
+    if (myAvatar) localStorage.setItem('gc_avatar', myAvatar); else localStorage.removeItem('gc_avatar');
+    socket.emit('update-profile', { name: myName, avatar: myAvatar });
+    updateHeaderProfile();
+    $('profile-menu').classList.remove('open');
+  } catch {
+    $('profile-menu-error').textContent = 'Network error — try again';
+  }
+  $('profile-menu-save-btn').disabled = false;
+});
+socket.on('profile-updated', ({ name, avatar }) => {
+  myName = name; myAvatar = avatar;
+  updateHeaderProfile();
 });
 
 /* ── grouping / positions ── */
@@ -467,6 +602,7 @@ $('messages').addEventListener('click', e => {
 /* ── more menu (header "..." button) ── */
 $('more-btn').addEventListener('click', e => {
   e.stopPropagation();
+  $('profile-menu').classList.remove('open');
   $('more-menu').classList.toggle('open');
 });
 document.addEventListener('click', e => {
@@ -586,8 +722,14 @@ function buildMessageDOM(data, isOwn, fromHistory) {
     if (!isOwn) {
       const av = document.createElement('div');
       av.className = 'avatar';
-      av.style.background = userColor(user);
-      av.textContent = user[0].toUpperCase();
+      if (data.avatar) {
+        const img = document.createElement('img');
+        img.className = 'avatar-img'; img.src = data.avatar; img.alt = '';
+        av.appendChild(img);
+      } else {
+        av.style.background = userColor(user);
+        av.textContent = user[0].toUpperCase();
+      }
       group.appendChild(av);
     }
     stack = document.createElement('div'); stack.className = 'bubble-stack';
@@ -998,5 +1140,5 @@ socket.on('user-count', n => { $('online-count').textContent = `${n} online`; })
 
 socket.on('disconnect', () => { if (hasJoinedOnce) showReconnectBanner(); });
 socket.on('connect', () => {
-  if (hasJoinedOnce && myName) socket.emit('join', { name: myName, clientId });
+  if (hasJoinedOnce && myName) socket.emit('join', { name: myName, clientId, avatar: myAvatar });
 });

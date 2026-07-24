@@ -16,14 +16,18 @@
 <canvas id="pcanvas"></canvas>
 <div id="bg"></div>
 
-<!-- LOGIN -->
-<div id="login-screen" class="screen">
+<!-- WELCOME / FIRST-TIME PROFILE SETUP -->
+<div id="login-screen" class="screen hidden">
   <div class="glass login-card" id="login-card">
-    <div class="logo-wrap">
-      <img class="logo-img" src="apple-touch-icon.png" alt="Glass Chat"/>
+    <div class="logo-wrap" id="setup-avatar-wrap">
+      <img class="logo-img" id="setup-avatar-preview" src="apple-touch-icon.png" alt="Your photo"/>
+      <button class="avatar-edit-btn" id="setup-avatar-btn" title="Choose a photo" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      </button>
+      <input type="file" id="setup-avatar-upload" accept="image/*" style="display:none"/>
     </div>
-    <h1 class="login-title">Glass Chat</h1>
-    <p class="login-sub">A beautiful place to talk</p>
+    <h1 class="login-title">Welcome to Glass Chat</h1>
+    <p class="login-sub">Set up your profile to get started</p>
     <input class="name-input" id="name-input" type="text" placeholder="Your name..." maxlength="20" autocomplete="off" spellcheck="false"/>
     <div class="field-error" id="field-error"></div>
     <button class="join-btn" id="join-btn">Join Chat</button>
@@ -34,9 +38,27 @@
 <div id="chat-screen" class="screen hidden">
   <div class="glass chat-card">
     <header class="chat-header">
-      <div class="header-left">
-        <img class="header-logo" src="favicon-32.png" alt=""/>
-        <span class="header-title">Glass Chat</span>
+      <div class="header-left profile-wrap">
+        <button class="profile-trigger" id="profile-trigger" title="Your profile" type="button">
+          <img class="header-logo" id="header-avatar" src="favicon-32.png" alt=""/>
+          <span class="header-title" id="header-username">Glass Chat</span>
+          <svg class="header-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="profile-menu" id="profile-menu">
+          <div class="profile-menu-avatar-row">
+            <div class="profile-avatar-edit-wrap">
+              <img id="profile-menu-avatar-preview" src="apple-touch-icon.png" alt=""/>
+              <button class="avatar-edit-btn" id="profile-menu-avatar-btn" title="Change photo" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              </button>
+            </div>
+            <input type="file" id="profile-menu-avatar-upload" accept="image/*" style="display:none"/>
+          </div>
+          <label class="profile-menu-label" for="profile-menu-name-input">Display name</label>
+          <input class="profile-menu-name-input" id="profile-menu-name-input" type="text" maxlength="20" autocomplete="off" spellcheck="false"/>
+          <div class="profile-menu-error" id="profile-menu-error"></div>
+          <button class="profile-menu-save-btn" id="profile-menu-save-btn" type="button">Save changes</button>
+        </div>
       </div>
       <div class="header-right">
         <button class="icon-btn" id="search-btn" title="Search">

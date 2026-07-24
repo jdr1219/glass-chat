@@ -14,8 +14,21 @@ const app    = express();
 const server = http.createServer(app);
 const io     = new Server(server, { cors: { origin: process.env.ALLOWED_ORIGIN || "*" }, maxHttpBufferSize: 4e6 });
 
+app.set("trust proxy", true);
+app.use(express.json({ limit: "2mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 app.get("/health", (req, res) => res.send("ok"));
+
+function getClientIp(req) {
+  const xff = req.headers["x-forwarded-for"];
+  if (xff) return xff.split(",")[0].trim();
+  return req.socket.remoteAddress || "unknown";
+}
+function getSocketIp(handshake) {
+  const xff = handshake.headers["x-forwarded-for"];
+  if (xff) return xff.split(",")[0].trim();
+  return handshake.address || "unknown";
+}
 
 /* ── Best-effort disk persistence ───────────────────────────
    Survives crashes/restarts within the same container.
@@ -51,14 +64,38 @@ function saveDebounced() {
   }, 800);
 }
 
+/* ── IP-keyed profile persistence (name + avatar) ──
+   Lets returning visitors skip the "type your name" screen —
+   we recognize their public IP and greet them straight into
+   chat with their saved name/photo. NOTE: everyone behind the
+   same public IP (e.g. same household/office NAT) shares one
+   saved profile — a known tradeoff of IP-based recognition. */
+const PROFILES_FILE = path.join(__dirname, "data", "profiles.json");
+function loadProfiles() {
+  try { return JSON.parse(fs.readFileSync(PROFILES_FILE, "utf8")); }
+  catch { return {}; }
+}
+let profileSaveTimer = null;
+function saveProfilesDebounced() {
+  clearTimeout(profileSaveTimer);
+  profileSaveTimer = setTimeout(() => {
+    try {
+      fs.mkdirSync(path.dirname(PROFILES_FILE), { recursive: true });
+      fs.writeFileSync(PROFILES_FILE, JSON.stringify(profiles));
+    } catch (e) { log.error("profile-save-failed", { err: e.message }); }
+  }, 500);
+}
+
 const MAX_HISTORY = 300;
 const PAGE_SIZE   = 30;
 const MAX_MSG_LEN = 2000;
 const MAX_IMG_LEN = 950000; // ~700KB base64, enough headroom for 1000px-wide JPEGs
+const MAX_AVATAR_LEN = 300000; // small square photo, plenty of headroom
 const RATE_LIMIT  = 8;
 
-const history = loadHistory();
-const users      = {};   // socket.id -> { name, clientId }
+const history  = loadHistory();
+const profiles = loadProfiles(); // ip -> { name, avatar, updatedAt }
+const users      = {};   // socket.id -> { name, clientId, avatar }
 const rateLimits = {};
 
 function evictStaleSocket(clientId, exceptSocketId) {
@@ -86,6 +123,33 @@ function publicMsg(m) {
     reactions: Object.entries(reactionsRaw || {}).map(([emoji, set]) => ({ emoji, users: [...set] })),
   };
 }
+function validAvatar(a) {
+  return typeof a === "string" && a.startsWith("data:image") && a.length < MAX_AVATAR_LEN ? a : null;
+}
+
+/* ── profile API: lets the client check/save the name+photo
+   tied to the visitor's public IP ── */
+app.get("/api/profile", (req, res) => {
+  const ip = getClientIp(req);
+  const p = profiles[ip];
+  if (p) res.json({ exists: true, name: p.name, avatar: p.avatar || null });
+  else res.json({ exists: false });
+});
+
+app.post("/api/profile", (req, res) => {
+  const ip = getClientIp(req);
+  const body = req.body || {};
+  const name = sanitize(body.name, 24);
+  if (!name) return res.status(400).json({ error: "Name required" });
+
+  const existing = profiles[ip] || {};
+  let avatar = existing.avatar || null;
+  if ("avatar" in body) avatar = body.avatar === null ? null : validAvatar(body.avatar);
+
+  profiles[ip] = { name, avatar, updatedAt: Date.now() };
+  saveProfilesDebounced();
+  res.json({ ok: true, name, avatar });
+});
 
 /* Open Graph link preview — no external API key needed */
 const previewCache = new Map();
@@ -114,7 +178,7 @@ async function fetchPreview(url) {
 io.on("connection", socket => {
   log.info("connect", { id: socket.id });
 
-  socket.on("join", ({ name, clientId } = {}) => {
+  socket.on("join", ({ name, clientId, avatar } = {}) => {
     const username = sanitize(name, 24);
     const cid = sanitize(clientId, 64) || null;
     if (!username) return socket.emit("error-msg", "Invalid name");
@@ -125,7 +189,7 @@ io.on("connection", socket => {
     if (conflict) return socket.emit("name-taken");
 
     if (cid) evictStaleSocket(cid, socket.id); // drop any earlier session from this same browser
-    users[socket.id] = { name: username, clientId: cid };
+    users[socket.id] = { name: username, clientId: cid, avatar: validAvatar(avatar) };
     log.info("join", { username });
 
     socket.emit("join-success");
@@ -133,6 +197,33 @@ io.on("connection", socket => {
     socket.emit("history-has-more", history.length > PAGE_SIZE);
     socket.broadcast.emit("system", `${username} joined`);
     io.emit("user-count", Object.keys(users).length);
+  });
+
+  socket.on("update-profile", (data = {}) => {
+    const u = users[socket.id]; if (!u) return;
+    let newName = u.name;
+    if (typeof data.name === "string") {
+      const sn = sanitize(data.name, 24);
+      if (sn && sn.toLowerCase() !== u.name.toLowerCase()) {
+        const conflict = Object.entries(users).find(
+          ([sid, x]) => sid !== socket.id && x.name.toLowerCase() === sn.toLowerCase()
+        );
+        if (conflict) return socket.emit("error-msg", "That name is already taken");
+        newName = sn;
+      } else if (sn) newName = sn;
+    }
+    let newAvatar = u.avatar;
+    if ("avatar" in data) newAvatar = data.avatar === null ? null : validAvatar(data.avatar);
+
+    const oldName = u.name;
+    u.name = newName; u.avatar = newAvatar;
+    socket.emit("profile-updated", { name: newName, avatar: newAvatar });
+    if (oldName !== newName) io.emit("system", `${oldName} is now known as ${newName}`);
+
+    // persist against this visitor's IP too, so it sticks on their next visit
+    const ip = getSocketIp(socket.handshake);
+    profiles[ip] = { name: newName, avatar: newAvatar, updatedAt: Date.now() };
+    saveProfilesDebounced();
   });
 
   socket.on("load-more", ({ before } = {}) => {
@@ -151,7 +242,7 @@ io.on("connection", socket => {
     if (!text && !image) return;
 
     const msg = {
-      user: username, socketId: socket.id,
+      user: username, avatar: users[socket.id]?.avatar || null, socketId: socket.id,
       id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       ts: Date.now(), text, image, edited: false, deleted: false,
       reactionsRaw: {},
@@ -237,6 +328,7 @@ function shutdown(signal) {
   try {
     fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
     fs.writeFileSync(DATA_FILE, JSON.stringify(serializeHistory()));
+    fs.writeFileSync(PROFILES_FILE, JSON.stringify(profiles));
   } catch {}
   server.close(() => { log.info("closed"); process.exit(0); });
   setTimeout(() => process.exit(1), 8000);

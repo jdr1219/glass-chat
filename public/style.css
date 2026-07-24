@@ -82,9 +82,15 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; over
 @keyframes cardOut { from{opacity:1;transform:translateY(0) scale(1);filter:blur(0);} to{opacity:0;transform:translateY(-12px) scale(.97);filter:blur(4px);} }
 .login-card.leaving { animation: cardOut .28s var(--ease-in) forwards; }
 
-.logo-wrap { display:inline-block; margin-bottom:22px; }
+.logo-wrap { display:inline-block; position:relative; margin-bottom:22px; }
 .logo-img { width:78px; height:78px; border-radius:20px; object-fit:cover; display:block; box-shadow:0 12px 30px rgba(63,169,224,.40),0 0 0 1px rgba(255,255,255,.4); animation: logoIn .6s var(--ease) .05s both; }
 @keyframes logoIn { from{opacity:0;transform:scale(.7) translateY(8px);} to{opacity:1;transform:scale(1) translateY(0);} }
+
+/* ── avatar upload badge — shared by the first-time setup screen and the profile settings dropdown ── */
+.avatar-edit-btn { position:absolute; right:-6px; bottom:-6px; width:28px; height:28px; border-radius:50%; background:var(--blue); border:2.5px solid rgba(255,255,255,.95); color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(63,169,224,.55); transition:transform .15s var(--ease); }
+.avatar-edit-btn:hover { transform:scale(1.08); }
+.avatar-edit-btn:active { transform:scale(.94); }
+.avatar-edit-btn svg { width:13px; height:13px; }
 
 .login-title { font-size:32px; font-weight:800; color:var(--ink); letter-spacing:-1.1px; margin-bottom:8px; animation: fadeUp .5s var(--ease) .10s both; }
 .login-sub { font-size:13.5px; color:var(--ink-soft); margin-bottom:36px; letter-spacing:.1px; animation: fadeUp .5s var(--ease) .16s both; }
@@ -108,8 +114,25 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; over
 .chat-header { flex-shrink:0; padding:13px 18px; background:rgba(255,255,255,0.14); border-bottom:1px solid rgba(255,255,255,0.30); display:flex; align-items:center; justify-content:space-between; gap:10px; }
 .header-left { display:flex; align-items:center; gap:9px; min-width:0; }
 .header-logo { width:28px; height:28px; border-radius:8px; object-fit:cover; flex-shrink:0; box-shadow:0 2px 8px rgba(15,40,60,.20); }
-.header-title { font-size:15px; font-weight:700; color:var(--ink); letter-spacing:-.3px; }
+.header-title { font-size:15px; font-weight:700; color:var(--ink); letter-spacing:-.3px; max-width:130px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .header-right { display:flex; align-items:center; gap:6px; }
+
+.profile-wrap { position:relative; min-width:0; }
+.profile-trigger { display:flex; align-items:center; gap:9px; background:none; border:none; padding:0; margin:0; font:inherit; color:inherit; cursor:pointer; min-width:0; }
+.header-chevron { width:11px; height:11px; color:var(--ink-soft); flex-shrink:0; transition:transform .15s var(--ease); }
+.profile-trigger:hover .header-chevron { transform:translateY(1px); }
+.profile-menu { position:absolute; top:calc(100% + 8px); left:0; background:rgba(255,255,255,0.92); backdrop-filter:blur(24px); border:1px solid rgba(255,255,255,0.7); border-radius:16px; box-shadow:0 14px 36px rgba(15,40,60,.25); padding:16px; width:min(230px,72vw); z-index:30; opacity:0; transform:scale(.92) translateY(-6px); pointer-events:none; transition:opacity .18s var(--ease),transform .18s var(--ease); }
+.profile-menu.open { opacity:1; transform:scale(1) translateY(0); pointer-events:auto; }
+.profile-menu-avatar-row { display:flex; justify-content:center; margin-bottom:14px; }
+.profile-avatar-edit-wrap { position:relative; width:64px; height:64px; }
+.profile-avatar-edit-wrap img { width:64px; height:64px; border-radius:50%; object-fit:cover; display:block; box-shadow:0 4px 12px rgba(15,40,60,.2); }
+.profile-menu-label { display:block; font-size:10.5px; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; }
+.profile-menu-name-input { width:100%; padding:9px 12px; background:rgba(255,255,255,0.55); border:1.5px solid rgba(255,255,255,0.6); border-radius:10px; font-size:13.5px; font-family:inherit; font-weight:600; color:var(--ink); outline:none; margin-bottom:6px; transition:border-color .2s var(--ease); }
+.profile-menu-name-input:focus { border-color:rgba(63,169,224,.65); }
+.profile-menu-error { font-size:11px; color:var(--alert); font-weight:600; min-height:14px; margin-bottom:6px; }
+.profile-menu-save-btn { width:100%; padding:9px; background:linear-gradient(135deg,var(--blue),var(--blue-deep)); border:none; border-radius:10px; color:#fff; font-size:12.5px; font-weight:700; font-family:inherit; cursor:pointer; transition:transform .15s var(--ease),opacity .15s; }
+.profile-menu-save-btn:hover { transform:translateY(-1px); }
+.profile-menu-save-btn:disabled { opacity:.6; cursor:default; transform:none; }
 
 .icon-btn { width:32px; height:32px; border-radius:50%; border:none; background:transparent; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--ink-soft); transition:background .15s var(--ease),transform .15s var(--ease),color .15s var(--ease); flex-shrink:0; }
 .icon-btn:hover { background:rgba(63,169,224,0.16); color:var(--blue-deep); transform:scale(1.08); }
@@ -147,8 +170,9 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; over
 .msg-group.other { flex-direction:row; }
 .msg-group.tight { margin-bottom:3px; animation:none; }
 
-.avatar { width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12.5px; font-weight:700; color:#fff; flex-shrink:0; box-shadow:0 2px 8px rgba(15,40,60,.25); margin-top:17px; }
+.avatar { width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12.5px; font-weight:700; color:#fff; flex-shrink:0; overflow:hidden; box-shadow:0 2px 8px rgba(15,40,60,.25); margin-top:17px; }
 .msg-group.own .avatar { display:none; }
+.avatar-img { width:100%; height:100%; object-fit:cover; display:block; }
 
 .bubble-stack { display:flex; flex-direction:column; gap:3px; max-width:84%; position:relative; }
 .msg-group.own .bubble-stack { align-items:flex-end; }
