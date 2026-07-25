@@ -22,11 +22,162 @@ function initLiquidGlass() {
 }
 initLiquidGlass();
 
+/* ════════════════════════════════════════════════
+   LIQUID GLASS RIPPLES — real WebGL shader.
+   A height field of decaying ripple waves is simulated per-pixel;
+   the gradient of that height field approximates a surface normal,
+   which is lit with a fixed light direction to produce a moving
+   specular highlight — i.e. an actual simulated liquid surface
+   catching light, not just a CSS gradient trick. Masked per-pixel
+   to each .glass element's exact rounded-rect shape so it never
+   bleeds outside the card. Wrapped in try/catch — if WebGL is
+   unavailable for any reason, the rest of the app is unaffected. */
+function initGlassRipples() {
+  try {
+    const canvas = document.getElementById('glass-ripple-canvas');
+    if (!canvas || !window.THREE) return;
+    const THREE = window.THREE;
+    const MAX_RIPPLES = 10;
+    const MAX_RECTS = 4;
+
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    if (!renderer.getContext()) return;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -1, 1);
+
+    const uniforms = {
+      uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+      uTime: { value: 0 },
+      uRippleCount: { value: 0 },
+      uRippleData: { value: new Float32Array(MAX_RIPPLES * 3) },
+      uRectCount: { value: 0 },
+      uRectData: { value: new Float32Array(MAX_RECTS * 5) },
+    };
+
+    const material = new THREE.ShaderMaterial({
+      uniforms,
+      transparent: true,
+      depthTest: false,
+      vertexShader: `void main(){ gl_Position = vec4(position,1.0); }`,
+      fragmentShader: `
+        precision highp float;
+        uniform vec2 uResolution;
+        uniform float uTime;
+        uniform int uRippleCount;
+        uniform float uRippleData[${MAX_RIPPLES * 3}];
+        uniform int uRectCount;
+        uniform float uRectData[${MAX_RECTS * 5}];
+
+        float roundedBoxSDF(vec2 p, vec2 halfSize, float radius) {
+          vec2 q = abs(p) - halfSize + radius;
+          return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - radius;
+        }
+
+        void main() {
+          vec2 px = vec2(gl_FragCoord.x, uResolution.y - gl_FragCoord.y);
+
+          float inside = 0.0;
+          float edgeFade = 0.0;
+          for (int i = 0; i < ${MAX_RECTS}; i++) {
+            if (i >= uRectCount) break;
+            vec2 c = vec2(uRectData[i*5+0], uRectData[i*5+1]);
+            vec2 halfSize = vec2(uRectData[i*5+2], uRectData[i*5+3]) * 0.5;
+            float radius = uRectData[i*5+4];
+            float d = roundedBoxSDF(px - c, halfSize, radius);
+            if (d < 0.0) { inside = 1.0; edgeFade = max(edgeFade, smoothstep(0.0, -10.0, d)); }
+          }
+          if (inside < 0.5) { gl_FragColor = vec4(0.0); return; }
+
+          vec2 grad = vec2(0.0);
+          for (int i = 0; i < ${MAX_RIPPLES}; i++) {
+            if (i >= uRippleCount) break;
+            vec2 origin = vec2(uRippleData[i*3+0], uRippleData[i*3+1]);
+            float startTime = uRippleData[i*3+2];
+            float age = uTime - startTime;
+            if (age < 0.0 || age > 2.4) continue;
+            vec2 toPixel = px - origin;
+            float dist = length(toPixel);
+            vec2 dir = dist > 0.001 ? toPixel / dist : vec2(0.0);
+            float phase = dist * 0.065 - age * 6.2;
+            float decay = exp(-age * 0.9) * exp(-dist * 0.006);
+            float dwave = cos(phase) * 0.22 * decay;
+            grad += dir * dwave;
+          }
+
+          float tilt = length(grad);
+          vec3 lightDir = normalize(vec3(-0.35, 0.55, 1.0));
+          vec3 normal = normalize(vec3(-grad * 2.0, 1.0));
+          float spec = pow(max(dot(normal, lightDir), 0.0), 9.0) * 2.2;
+          float rim = smoothstep(0.0, 0.35, tilt) * 0.9;
+
+          float alpha = clamp(spec + rim, 0.0, 1.0) * edgeFade;
+          gl_FragColor = vec4(vec3(1.0), alpha);
+        }
+      `,
+    });
+
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material));
+
+    let ripples = [];
+    const clock = new THREE.Clock();
+
+    function addGlassRipple(xPx, yPx) {
+      ripples.push({ x: xPx, y: yPx, time: clock.getElapsedTime() });
+      if (ripples.length > MAX_RIPPLES) ripples.shift();
+    }
+    window.__addGlassRipple = addGlassRipple; // exposed for send/receive hooks below
+
+    function updateRects() {
+      const els = document.querySelectorAll('.glass');
+      const data = uniforms.uRectData.value;
+      let count = 0;
+      els.forEach(el => {
+        if (count >= MAX_RECTS) return;
+        const r = el.getBoundingClientRect();
+        if (r.width === 0 || r.height === 0) return;
+        const radius = parseFloat(getComputedStyle(el).borderRadius) || 0;
+        data[count*5+0] = r.left + r.width / 2;
+        data[count*5+1] = r.top + r.height / 2;
+        data[count*5+2] = r.width;
+        data[count*5+3] = r.height;
+        data[count*5+4] = radius;
+        count++;
+      });
+      uniforms.uRectCount.value = count;
+    }
+
+    function tick() {
+      requestAnimationFrame(tick);
+      const now = clock.getElapsedTime();
+      uniforms.uTime.value = now;
+      ripples = ripples.filter(r => now - r.time < 2.4);
+      const data = uniforms.uRippleData.value;
+      ripples.forEach((r, i) => { data[i*3] = r.x; data[i*3+1] = r.y; data[i*3+2] = r.time; });
+      uniforms.uRippleCount.value = ripples.length;
+      updateRects();
+      renderer.render(scene, camera);
+    }
+    tick();
+
+    window.addEventListener('resize', () => {
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      uniforms.uResolution.value.set(window.innerWidth, window.innerHeight);
+    });
+
+    document.querySelectorAll('.glass').forEach(el => {
+      el.addEventListener('pointerdown', e => addGlassRipple(e.clientX, e.clientY));
+    });
+    console.log('✅ Liquid glass ripples initialized');
+  } catch (e) {
+    console.warn('Liquid glass ripples unavailable:', e);
+  }
+}
+initGlassRipples();
 
 let myName = '';
-let myAvatar = null;
-let pendingSetupAvatar = null;
-let pendingProfileMenuAvatar; // undefined = "no new upload chosen this time menu was opened"
 let lastGroupEl = null, lastGroupUser = null, lastGroupTime = 0;
 let replyTarget = null, editTarget = null;
 let typingTimers = {};
@@ -68,6 +219,313 @@ function renderRich(text) {
   html = html.replace(/@([A-Za-z0-9_]{1,24})/g, (m, name) => `<span class="mention">@${name}</span>`);
   return html;
 }
+
+/* ════════════════════════════════════════════════
+   THEME SYSTEM — 15 selectable palettes. Switching a
+   theme recolors the glass tint (via CSS custom props),
+   the Vanta fog background, and the favicon/app icons.
+   Colors crossfade smoothly (~650ms) instead of
+   snapping, Chrome-theme-picker style, and the Vanta
+   fog is tweened in lockstep frame-by-frame.
+════════════════════════════════════════════════ */
+const THEMES = [
+  { id:'sky', name:'Sky Blue & White', slug:'', dark:false,
+    blue:'#3fa9e0', blueDeep:'#1f7fc9', blueLight:'#a3cfff', bluePale:'#cfe9ff',
+    ink:'#15243a', inkSoft:'#4a6a8a',
+    glassBg:'rgba(255,255,255,0.045)', glassBorder:'rgba(255,255,255,0.38)',
+    ownBg:'rgba(63,169,224,0.30)', ownBorder:'rgba(63,169,224,0.42)',
+    recvBg:'rgba(255,255,255,0.62)', recvBorder:'rgba(255,255,255,0.55)',
+    alert:'#1f4e7a', bodyBg:'#9fd8f0',
+    popupBg:'rgba(255,255,255,0.92)', popupBorder:'rgba(255,255,255,0.7)',
+    vanta:{ highlight:0x48b8e3, midtone:0xa3cfff, lowlight:0x28b1a6, base:0xffffff } },
+  { id:'mono', name:'Black, Grey & White', slug:'mono', dark:true,
+    blue:'#9aa4ad', blueDeep:'#6b7480', blueLight:'#c7ced4', bluePale:'#e7eaee',
+    ink:'#f2f4f6', inkSoft:'#b7bfc7',
+    glassBg:'rgba(20,20,22,0.38)', glassBorder:'rgba(255,255,255,0.14)',
+    ownBg:'rgba(154,164,173,0.34)', ownBorder:'rgba(154,164,173,0.5)',
+    recvBg:'rgba(40,42,46,0.62)', recvBorder:'rgba(255,255,255,0.14)',
+    alert:'#e2574c', bodyBg:'#1a1b1e',
+    popupBg:'rgba(24,24,26,0.94)', popupBorder:'rgba(255,255,255,0.12)',
+    vanta:{ highlight:0x8b98a3, midtone:0x3a3d42, lowlight:0x111214, base:0x000000 } },
+  { id:'rose', name:'French Rose & White', slug:'rose', dark:false,
+    blue:'#e88fa8', blueDeep:'#c85f82', blueLight:'#f7c9d6', bluePale:'#fde8ee',
+    ink:'#3a1f2a', inkSoft:'#8a5b6c',
+    glassBg:'rgba(255,255,255,0.045)', glassBorder:'rgba(255,255,255,0.4)',
+    ownBg:'rgba(232,143,168,0.32)', ownBorder:'rgba(232,143,168,0.45)',
+    recvBg:'rgba(255,255,255,0.65)', recvBorder:'rgba(255,255,255,0.55)',
+    alert:'#a3355a', bodyBg:'#f6d3de',
+    popupBg:'rgba(255,255,255,0.92)', popupBorder:'rgba(255,255,255,0.7)',
+    vanta:{ highlight:0xe88fa8, midtone:0xf7c9d6, lowlight:0xc85f82, base:0xffffff } },
+  { id:'crimson', name:'Red & Black', slug:'crimson', dark:true,
+    blue:'#e0483f', blueDeep:'#a5271f', blueLight:'#f28e86', bluePale:'#f9c9c5',
+    ink:'#f7e9e8', inkSoft:'#d4a8a5',
+    glassBg:'rgba(24,16,16,0.4)', glassBorder:'rgba(255,255,255,0.14)',
+    ownBg:'rgba(224,72,63,0.36)', ownBorder:'rgba(224,72,63,0.5)',
+    recvBg:'rgba(40,26,26,0.62)', recvBorder:'rgba(255,255,255,0.14)',
+    alert:'#ff6b5e', bodyBg:'#150808',
+    popupBg:'rgba(26,16,16,0.94)', popupBorder:'rgba(255,255,255,0.12)',
+    vanta:{ highlight:0xe0483f, midtone:0x5c1a16, lowlight:0x1a0808, base:0x000000 } },
+  { id:'sunset', name:'Red, Orange & Yellow', slug:'sunset', dark:false,
+    blue:'#f4762b', blueDeep:'#d3450f', blueLight:'#ffb066', bluePale:'#ffe3b0',
+    ink:'#3a1e0a', inkSoft:'#8a5a2e',
+    glassBg:'rgba(255,255,255,0.06)', glassBorder:'rgba(255,255,255,0.4)',
+    ownBg:'rgba(244,118,43,0.32)', ownBorder:'rgba(244,118,43,0.46)',
+    recvBg:'rgba(255,255,255,0.62)', recvBorder:'rgba(255,255,255,0.55)',
+    alert:'#c73e1d', bodyBg:'#ffb84d',
+    popupBg:'rgba(255,255,255,0.92)', popupBorder:'rgba(255,255,255,0.7)',
+    vanta:{ highlight:0xff6a3d, midtone:0xffce54, lowlight:0xd3450f, base:0xfff3d6 } },
+  { id:'amber', name:'Orange & Tan', slug:'amber', dark:false,
+    blue:'#d98a4e', blueDeep:'#b3652b', blueLight:'#eec295', bluePale:'#f7e2c8',
+    ink:'#3a2a18', inkSoft:'#8a6f4e',
+    glassBg:'rgba(255,255,255,0.06)', glassBorder:'rgba(255,255,255,0.4)',
+    ownBg:'rgba(217,138,78,0.32)', ownBorder:'rgba(217,138,78,0.45)',
+    recvBg:'rgba(255,255,255,0.64)', recvBorder:'rgba(255,255,255,0.55)',
+    alert:'#9c4b1e', bodyBg:'#e8c69a',
+    popupBg:'rgba(255,255,255,0.92)', popupBorder:'rgba(255,255,255,0.7)',
+    vanta:{ highlight:0xd98a4e, midtone:0xeec295, lowlight:0xb3652b, base:0xfff6e8 } },
+  { id:'gold', name:'Yellow & White', slug:'gold', dark:false,
+    blue:'#e0b83f', blueDeep:'#b6920f', blueLight:'#f2dd8f', bluePale:'#faf0cf',
+    ink:'#3a3010', inkSoft:'#8a7a40',
+    glassBg:'rgba(255,255,255,0.06)', glassBorder:'rgba(255,255,255,0.42)',
+    ownBg:'rgba(224,184,63,0.34)', ownBorder:'rgba(224,184,63,0.48)',
+    recvBg:'rgba(255,255,255,0.66)', recvBorder:'rgba(255,255,255,0.56)',
+    alert:'#a17a12', bodyBg:'#fbe89a',
+    popupBg:'rgba(255,255,255,0.92)', popupBorder:'rgba(255,255,255,0.7)',
+    vanta:{ highlight:0xe0b83f, midtone:0xf2dd8f, lowlight:0xb6920f, base:0xffffff } },
+  { id:'sage', name:'Pastel Green & Beige', slug:'sage', dark:false,
+    blue:'#8fae86', blueDeep:'#5f8054', blueLight:'#c4d8bd', bluePale:'#e8f0e2',
+    ink:'#2a3324', inkSoft:'#6f7d64',
+    glassBg:'rgba(255,255,255,0.08)', glassBorder:'rgba(255,255,255,0.44)',
+    ownBg:'rgba(143,174,134,0.32)', ownBorder:'rgba(143,174,134,0.45)',
+    recvBg:'rgba(255,255,255,0.66)', recvBorder:'rgba(255,255,255,0.55)',
+    alert:'#7a5a2e', bodyBg:'#e6ddc4',
+    popupBg:'rgba(255,255,255,0.92)', popupBorder:'rgba(255,255,255,0.7)',
+    vanta:{ highlight:0x9fbf94, midtone:0xd9d0b0, lowlight:0x6f9060, base:0xf5f0e0 } },
+  { id:'hacker', name:'Hacker Green & Black', slug:'hacker', dark:true,
+    blue:'#39ff6a', blueDeep:'#1fbf4a', blueLight:'#8dffab', bluePale:'#c9ffd6',
+    ink:'#c9ffd2', inkSoft:'#5fcf7d',
+    glassBg:'rgba(10,20,12,0.42)', glassBorder:'rgba(57,255,106,0.22)',
+    ownBg:'rgba(57,255,106,0.22)', ownBorder:'rgba(57,255,106,0.45)',
+    recvBg:'rgba(10,26,14,0.66)', recvBorder:'rgba(57,255,106,0.20)',
+    alert:'#ff5555', bodyBg:'#050a06',
+    popupBg:'rgba(6,16,8,0.94)', popupBorder:'rgba(57,255,106,0.25)',
+    vanta:{ highlight:0x39ff6a, midtone:0x0f4d24, lowlight:0x030906, base:0x000000 } },
+  { id:'forest', name:'Brown & Dark Green', slug:'forest', dark:true,
+    blue:'#9c7a4e', blueDeep:'#6e5333', blueLight:'#c9ac7c', bluePale:'#e3d3b3',
+    ink:'#eee3cf', inkSoft:'#b7a684',
+    glassBg:'rgba(18,22,16,0.42)', glassBorder:'rgba(255,255,255,0.13)',
+    ownBg:'rgba(156,122,78,0.34)', ownBorder:'rgba(156,122,78,0.48)',
+    recvBg:'rgba(28,34,24,0.64)', recvBorder:'rgba(255,255,255,0.13)',
+    alert:'#e08a3e', bodyBg:'#141d14',
+    popupBg:'rgba(20,26,18,0.94)', popupBorder:'rgba(255,255,255,0.12)',
+    vanta:{ highlight:0x9c7a4e, midtone:0x2f4a2f, lowlight:0x121a10, base:0x000000 } },
+  { id:'cobalt', name:'Blue & Deep Blue', slug:'cobalt', dark:false,
+    blue:'#3a6fd8', blueDeep:'#1c3f96', blueLight:'#8fb0ee', bluePale:'#d3e0fb',
+    ink:'#101a33', inkSoft:'#48587a',
+    glassBg:'rgba(255,255,255,0.07)', glassBorder:'rgba(255,255,255,0.4)',
+    ownBg:'rgba(58,111,216,0.32)', ownBorder:'rgba(58,111,216,0.46)',
+    recvBg:'rgba(255,255,255,0.62)', recvBorder:'rgba(255,255,255,0.55)',
+    alert:'#1c3f96', bodyBg:'#7fa3e8',
+    popupBg:'rgba(255,255,255,0.92)', popupBorder:'rgba(255,255,255,0.7)',
+    vanta:{ highlight:0x3a6fd8, midtone:0x8fb0ee, lowlight:0x1c3f96, base:0xe8f0ff } },
+  { id:'violet', name:'Purple & Blue', slug:'violet', dark:false,
+    blue:'#8a6fe0', blueDeep:'#5a3fc4', blueLight:'#bda8f2', bluePale:'#e3d9fb',
+    ink:'#211238', inkSoft:'#5e4a80',
+    glassBg:'rgba(255,255,255,0.07)', glassBorder:'rgba(255,255,255,0.4)',
+    ownBg:'rgba(138,111,224,0.32)', ownBorder:'rgba(138,111,224,0.46)',
+    recvBg:'rgba(255,255,255,0.63)', recvBorder:'rgba(255,255,255,0.55)',
+    alert:'#5a3fc4', bodyBg:'#b3a3ec',
+    popupBg:'rgba(255,255,255,0.92)', popupBorder:'rgba(255,255,255,0.7)',
+    vanta:{ highlight:0x8a6fe0, midtone:0x6f8fea, lowlight:0x5a3fc4, base:0xf0ecff } },
+  { id:'lavender', name:'Purple & White', slug:'lavender', dark:false,
+    blue:'#a98ee0', blueDeep:'#7c5cc7', blueLight:'#d3c0f2', bluePale:'#f0e8fb',
+    ink:'#2e2140', inkSoft:'#6c5a8a',
+    glassBg:'rgba(255,255,255,0.07)', glassBorder:'rgba(255,255,255,0.42)',
+    ownBg:'rgba(169,142,224,0.30)', ownBorder:'rgba(169,142,224,0.44)',
+    recvBg:'rgba(255,255,255,0.66)', recvBorder:'rgba(255,255,255,0.56)',
+    alert:'#7c5cc7', bodyBg:'#e5d9f7',
+    popupBg:'rgba(255,255,255,0.92)', popupBorder:'rgba(255,255,255,0.7)',
+    vanta:{ highlight:0xa98ee0, midtone:0xd3c0f2, lowlight:0x7c5cc7, base:0xffffff } },
+  { id:'platinum', name:'White & Silver', slug:'platinum', dark:false,
+    blue:'#9aa3ab', blueDeep:'#707a82', blueLight:'#c9d0d6', bluePale:'#eef1f3',
+    ink:'#20262b', inkSoft:'#5c6871',
+    glassBg:'rgba(255,255,255,0.10)', glassBorder:'rgba(255,255,255,0.5)',
+    ownBg:'rgba(154,163,171,0.28)', ownBorder:'rgba(154,163,171,0.42)',
+    recvBg:'rgba(255,255,255,0.70)', recvBorder:'rgba(255,255,255,0.6)',
+    alert:'#54626b', bodyBg:'#dde3e7',
+    popupBg:'rgba(255,255,255,0.94)', popupBorder:'rgba(255,255,255,0.75)',
+    vanta:{ highlight:0xc3cbd1, midtone:0xe8ecef, lowlight:0x9aa3ab, base:0xffffff } },
+  { id:'champagne', name:'Silver & Gold', slug:'champagne', dark:false,
+    blue:'#c9a865', blueDeep:'#a3813e', blueLight:'#e0cc9a', bluePale:'#f4ecd8',
+    ink:'#2e2818', inkSoft:'#7a6c48',
+    glassBg:'rgba(255,255,255,0.09)', glassBorder:'rgba(255,255,255,0.46)',
+    ownBg:'rgba(201,168,101,0.30)', ownBorder:'rgba(201,168,101,0.44)',
+    recvBg:'rgba(255,255,255,0.68)', recvBorder:'rgba(255,255,255,0.58)',
+    alert:'#8a6a2e', bodyBg:'#e8dcc0',
+    popupBg:'rgba(255,255,255,0.93)', popupBorder:'rgba(255,255,255,0.72)',
+    vanta:{ highlight:0xc9a865, midtone:0xe0cc9a, lowlight:0xa3813e, base:0xfaf3e2 } },
+];
+
+const THEME_VAR_MAP = {
+  blue:'--blue', blueDeep:'--blue-deep', blueLight:'--blue-light', bluePale:'--blue-pale',
+  ink:'--ink', inkSoft:'--ink-soft',
+  glassBg:'--glass-bg', glassBorder:'--glass-border',
+  ownBg:'--own-bg', ownBorder:'--own-border',
+  recvBg:'--recv-bg', recvBorder:'--recv-border',
+  alert:'--alert', bodyBg:'--body-bg',
+  popupBg:'--popup-bg', popupBorder:'--popup-border',
+};
+
+function getTheme(id) { return THEMES.find(t => t.id === id) || THEMES[0]; }
+
+function parseColorStr(str) {
+  str = String(str).trim();
+  if (str[0] === '#') {
+    let hex = str.slice(1);
+    if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+    const n = parseInt(hex, 16);
+    return { r:(n>>16)&255, g:(n>>8)&255, b:n&255, a:1 };
+  }
+  const m = str.match(/rgba?\(([^)]+)\)/i);
+  if (m) {
+    const p = m[1].split(',').map(s => parseFloat(s));
+    return { r:p[0]||0, g:p[1]||0, b:p[2]||0, a: p.length>3 ? p[3] : 1 };
+  }
+  return { r:0, g:0, b:0, a:1 };
+}
+function lerpColorStr(c1, c2, t) {
+  const a = parseColorStr(c1), b = parseColorStr(c2);
+  const r = Math.round(a.r + (b.r-a.r)*t), g = Math.round(a.g + (b.g-a.g)*t), bl = Math.round(a.b + (b.b-a.b)*t);
+  const al = a.a + (b.a-a.a)*t;
+  return `rgba(${r},${g},${bl},${al.toFixed(3)})`;
+}
+function lerpHexNum(n1, n2, t) {
+  const r1=(n1>>16)&255, g1=(n1>>8)&255, b1=n1&255;
+  const r2=(n2>>16)&255, g2=(n2>>8)&255, b2=n2&255;
+  const r = Math.round(r1+(r2-r1)*t), g = Math.round(g1+(g2-g1)*t), b = Math.round(b1+(b2-b1)*t);
+  return (r<<16)|(g<<8)|b;
+}
+
+let currentThemeId = localStorage.getItem('gc_theme') || 'sky';
+if (!THEMES.some(t => t.id === currentThemeId)) currentThemeId = 'sky';
+let vantaEffect = null;
+let themeAnimRaf = null;
+const themeGridContainers = [];
+
+function swapImgSrc(imgs, href, fallback) {
+  imgs.forEach(img => {
+    const test = new Image();
+    test.onload = () => { img.src = href; };
+    test.onerror = () => { img.src = fallback; };
+    test.src = href;
+  });
+}
+function setFaviconLink(id, href, fallback) {
+  const link = document.getElementById(id);
+  if (!link) return;
+  const test = new Image();
+  test.onload = () => { link.href = href; };
+  test.onerror = () => { link.href = fallback; };
+  test.src = href;
+}
+function applyFavicon(theme) {
+  const suffix = theme.slug ? `-${theme.slug}` : '';
+  setFaviconLink('icon-ico', `favicon${suffix}.ico`, 'favicon.ico');
+  setFaviconLink('icon-32', `favicon-32${suffix}.png`, 'favicon-32.png');
+  setFaviconLink('apple-touch', `apple-touch-icon${suffix}.png`, 'apple-touch-icon.png');
+  swapImgSrc(document.querySelectorAll('.logo-img'), `apple-touch-icon${suffix}.png`, 'apple-touch-icon.png');
+  swapImgSrc(document.querySelectorAll('.header-logo'), `favicon-32${suffix}.png`, 'favicon-32.png');
+}
+
+function refreshThemeGridSelection() {
+  themeGridContainers.forEach(container => {
+    container.querySelectorAll('.theme-swatch').forEach(el => {
+      el.classList.toggle('active', el.dataset.themeId === currentThemeId);
+    });
+  });
+}
+
+function applyTheme(id, { animate = true } = {}) {
+  const from = getTheme(currentThemeId);
+  const to = getTheme(id);
+  currentThemeId = id;
+  localStorage.setItem('gc_theme', id);
+  applyFavicon(to);
+  refreshThemeGridSelection();
+
+  const root = document.documentElement.style;
+  if (themeAnimRaf) cancelAnimationFrame(themeAnimRaf);
+
+  if (!animate) {
+    Object.entries(THEME_VAR_MAP).forEach(([key, cssVar]) => root.setProperty(cssVar, to[key]));
+    if (vantaEffect) vantaEffect.setOptions({
+      highlightColor: to.vanta.highlight, midtoneColor: to.vanta.midtone,
+      lowlightColor: to.vanta.lowlight, baseColor: to.vanta.base,
+    });
+    return;
+  }
+
+  const DUR = 650;
+  const start = performance.now();
+  function tick(now) {
+    const t = Math.min(1, (now - start) / DUR);
+    const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic — matches the app's --ease feel
+    Object.entries(THEME_VAR_MAP).forEach(([key, cssVar]) => {
+      root.setProperty(cssVar, lerpColorStr(from[key], to[key], eased));
+    });
+    if (vantaEffect) {
+      vantaEffect.setOptions({
+        highlightColor: lerpHexNum(from.vanta.highlight, to.vanta.highlight, eased),
+        midtoneColor: lerpHexNum(from.vanta.midtone, to.vanta.midtone, eased),
+        lowlightColor: lerpHexNum(from.vanta.lowlight, to.vanta.lowlight, eased),
+        baseColor: lerpHexNum(from.vanta.base, to.vanta.base, eased),
+      });
+    }
+    if (t < 1) themeAnimRaf = requestAnimationFrame(tick);
+    else themeAnimRaf = null;
+  }
+  themeAnimRaf = requestAnimationFrame(tick);
+}
+
+function buildThemeSwatch(theme) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'theme-swatch' + (theme.id === currentThemeId ? ' active' : '');
+  btn.dataset.themeId = theme.id;
+  const dot = document.createElement('span');
+  dot.className = 'theme-swatch-dot';
+  dot.style.background = `linear-gradient(135deg, ${theme.blue} 0%, ${theme.blueDeep} 55%, ${theme.bodyBg} 100%)`;
+  const label = document.createElement('span');
+  label.className = 'theme-swatch-name';
+  label.textContent = theme.name;
+  btn.appendChild(dot); btn.appendChild(label);
+  btn.addEventListener('click', () => applyTheme(theme.id, { animate: true }));
+  return btn;
+}
+function renderThemeGrid(container) {
+  if (!container) return;
+  container.innerHTML = '';
+  THEMES.forEach(theme => container.appendChild(buildThemeSwatch(theme)));
+  if (!themeGridContainers.includes(container)) themeGridContainers.push(container);
+}
+
+/* Init Vanta with whatever theme is already saved, then apply the
+   rest of that theme's CSS vars instantly — no flash of the default
+   sky theme before the saved one kicks in. */
+(function initThemeAndVanta() {
+  const theme = getTheme(currentThemeId);
+  try {
+    if (window.THREE && window.VANTA) {
+      vantaEffect = VANTA.FOG({
+        el: '#bg', mouseControls: true, touchControls: true, gyroControls: false,
+        minHeight: 200, minWidth: 200,
+        highlightColor: theme.vanta.highlight, midtoneColor: theme.vanta.midtone,
+        lowlightColor: theme.vanta.lowlight, baseColor: theme.vanta.base,
+      });
+    }
+  } catch (e) { console.warn('Vanta init failed:', e); }
+  applyTheme(currentThemeId, { animate: false });
+})();
 
 /* ── particles ── */
 class Particles {
@@ -200,68 +658,13 @@ function hideMessageLocally(msg, alsoUnsend) {
   rerenderAll();
 }
 
-/* ── login / profile setup ──
-   We recognize returning visitors by their public IP (server-side
-   /api/profile lookup) and skip the "type your name" screen entirely.
-   First-time visitors get a one-time welcome screen to set a name + photo. */
+/* ── login ── */
+const savedName = localStorage.getItem('gc_name');
+if (savedName) $('name-input').value = savedName;
+
 function showFieldError(msg) { $('field-error').textContent = msg || ''; }
 
-function updateHeaderProfile() {
-  $('header-username').textContent = myName || 'Glass Chat';
-  $('header-avatar').src = myAvatar || 'favicon-32.png';
-}
-
-function goStraightToChat() {
-  hasJoinedOnce = true;
-  $('login-screen').classList.add('hidden');
-  $('chat-screen').classList.remove('hidden');
-  updateHeaderProfile();
-  socket.emit('join', { name: myName, clientId, avatar: myAvatar });
-}
-
-function showWelcomeScreen() {
-  $('login-screen').classList.remove('hidden');
-  setTimeout(() => $('name-input').focus(), 50);
-}
-
-async function initProfile() {
-  try {
-    const res = await fetch('/api/profile');
-    const data = await res.json();
-    if (data.exists) {
-      myName = data.name;
-      myAvatar = data.avatar || null;
-      localStorage.setItem('gc_name', myName);
-      if (myAvatar) localStorage.setItem('gc_avatar', myAvatar); else localStorage.removeItem('gc_avatar');
-      goStraightToChat();
-      return;
-    }
-  } catch {}
-  // no saved profile for this IP (or the lookup failed) — fall back to
-  // any locally cached profile before asking the person to set one up
-  const cachedName = localStorage.getItem('gc_name');
-  if (cachedName) {
-    myName = cachedName;
-    myAvatar = localStorage.getItem('gc_avatar') || null;
-    goStraightToChat();
-  } else {
-    showWelcomeScreen();
-  }
-}
-initProfile();
-
-$('setup-avatar-btn').addEventListener('click', () => $('setup-avatar-upload').click());
-$('setup-avatar-upload').addEventListener('change', async e => {
-  const file = e.target.files[0];
-  if (!file) return;
-  try {
-    const dataUrl = await fileToResizedDataUrl(file, 200, 0.85);
-    pendingSetupAvatar = dataUrl;
-    $('setup-avatar-preview').src = dataUrl;
-  } catch {}
-});
-
-async function joinChat() {
+function joinChat() {
   const nameInp = $('name-input');
   const name = nameInp.value.trim();
   if (!name) {
@@ -273,39 +676,32 @@ async function joinChat() {
   showFieldError('');
   $('join-btn').disabled = true;
   myName = name;
-  myAvatar = pendingSetupAvatar || null;
   localStorage.setItem('gc_name', name);
-  if (myAvatar) localStorage.setItem('gc_avatar', myAvatar); else localStorage.removeItem('gc_avatar');
-  try {
-    await fetch('/api/profile', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, avatar: myAvatar }),
-    });
-  } catch {}
-  socket.emit('join', { name, clientId, avatar: myAvatar });
+  socket.emit('join', { name, clientId });
 }
 $('join-btn').addEventListener('click', joinChat);
 $('name-input').addEventListener('keydown', e => { if (e.key==='Enter') joinChat(); });
+
+/* welcome-screen theme picker */
+$('login-theme-btn').addEventListener('click', () => {
+  renderThemeGrid($('theme-grid-modal'));
+  $('theme-modal-overlay').classList.remove('hidden');
+});
+$('theme-modal-close').addEventListener('click', () => $('theme-modal-overlay').classList.add('hidden'));
+$('theme-modal-overlay').addEventListener('click', e => {
+  if (e.target === $('theme-modal-overlay')) $('theme-modal-overlay').classList.add('hidden');
+});
 
 socket.on('name-taken', () => {
   $('join-btn').disabled = false;
   showFieldError('That name is already taken');
   $('name-input').classList.remove('shake'); void $('name-input').offsetWidth; $('name-input').classList.add('shake');
 });
-socket.on('error-msg', msg => {
-  if ($('profile-menu').classList.contains('open')) $('profile-menu-error').textContent = msg;
-  else showFieldError(msg);
-});
+socket.on('error-msg', msg => showFieldError(msg));
 
 socket.on('join-success', () => {
   $('join-btn').disabled = false;
-  updateHeaderProfile();
-  if (!$('chat-screen').classList.contains('hidden')) {
-    // already showing chat (returning-profile flow went straight in)
-    hasJoinedOnce ? hideReconnectBanner() : ($('msg-input').focus());
-    hasJoinedOnce = true;
-  } else {
-    // first-time welcome/setup flow — animate the setup card away
+  if (!hasJoinedOnce) {
     hasJoinedOnce = true;
     $('login-card').classList.add('leaving');
     setTimeout(() => {
@@ -313,69 +709,9 @@ socket.on('join-success', () => {
       $('chat-screen').classList.remove('hidden');
       $('msg-input').focus();
     }, 280);
+  } else {
+    hideReconnectBanner();
   }
-});
-
-/* ── settings dropdown: change display name / photo any time ── */
-$('profile-trigger').addEventListener('click', e => {
-  e.stopPropagation();
-  $('more-menu').classList.remove('open');
-  const menu = $('profile-menu');
-  const opening = !menu.classList.contains('open');
-  menu.classList.toggle('open');
-  if (opening) {
-    $('profile-menu-name-input').value = myName;
-    $('profile-menu-avatar-preview').src = myAvatar || 'apple-touch-icon.png';
-    $('profile-menu-error').textContent = '';
-    pendingProfileMenuAvatar = undefined;
-  }
-});
-document.addEventListener('click', e => {
-  if (!$('profile-menu').contains(e.target) && !$('profile-trigger').contains(e.target)) {
-    $('profile-menu').classList.remove('open');
-  }
-});
-$('profile-menu-avatar-btn').addEventListener('click', () => $('profile-menu-avatar-upload').click());
-$('profile-menu-avatar-upload').addEventListener('change', async e => {
-  const file = e.target.files[0];
-  if (!file) return;
-  try {
-    const dataUrl = await fileToResizedDataUrl(file, 200, 0.85);
-    pendingProfileMenuAvatar = dataUrl;
-    $('profile-menu-avatar-preview').src = dataUrl;
-  } catch {}
-});
-$('profile-menu-save-btn').addEventListener('click', async () => {
-  const newName = $('profile-menu-name-input').value.trim();
-  if (!newName) { $('profile-menu-error').textContent = 'Enter a name'; return; }
-  $('profile-menu-error').textContent = '';
-  $('profile-menu-save-btn').disabled = true;
-  const payload = { name: newName };
-  if (pendingProfileMenuAvatar !== undefined) payload.avatar = pendingProfileMenuAvatar;
-  try {
-    const res = await fetch('/api/profile', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      $('profile-menu-error').textContent = data.error || 'Could not save';
-      $('profile-menu-save-btn').disabled = false;
-      return;
-    }
-    myName = data.name; myAvatar = data.avatar;
-    localStorage.setItem('gc_name', myName);
-    if (myAvatar) localStorage.setItem('gc_avatar', myAvatar); else localStorage.removeItem('gc_avatar');
-    socket.emit('update-profile', { name: myName, avatar: myAvatar });
-    updateHeaderProfile();
-    $('profile-menu').classList.remove('open');
-  } catch {
-    $('profile-menu-error').textContent = 'Network error — try again';
-  }
-  $('profile-menu-save-btn').disabled = false;
-});
-socket.on('profile-updated', ({ name, avatar }) => {
-  myName = name; myAvatar = avatar;
-  updateHeaderProfile();
 });
 
 /* ── grouping / positions ── */
@@ -602,7 +938,6 @@ $('messages').addEventListener('click', e => {
 /* ── more menu (header "..." button) ── */
 $('more-btn').addEventListener('click', e => {
   e.stopPropagation();
-  $('profile-menu').classList.remove('open');
   $('more-menu').classList.toggle('open');
 });
 document.addEventListener('click', e => {
@@ -699,6 +1034,44 @@ function startEdit(msg) {
 $('edit-bar-close').addEventListener('click', () => { editTarget = null; $('edit-bar').classList.remove('open'); $('msg-input').value=''; });
 
 /* ════════════════════════════════════════════════
+   SETTINGS screen — theme grid + sign out
+════════════════════════════════════════════════ */
+function openSettings() {
+  $('more-menu').classList.remove('open');
+  renderThemeGrid($('theme-grid-settings'));
+  $('settings-screen').classList.remove('hidden');
+}
+function closeSettings() {
+  $('settings-screen').classList.add('hidden');
+}
+$('settings-btn').addEventListener('click', openSettings);
+$('settings-back-btn').addEventListener('click', closeSettings);
+
+function signOut() {
+  if (!confirm('Sign out of Glass Chat?')) return;
+  localStorage.removeItem('gc_name');
+  myName = '';
+  hasJoinedOnce = false;
+  closeSettings();
+  $('chat-screen').classList.add('hidden');
+  $('recently-deleted-screen').classList.add('hidden');
+  $('login-screen').classList.remove('hidden');
+  $('name-input').value = '';
+  $('field-error').textContent = '';
+  $('messages').innerHTML = '';
+  allMessages.clear();
+  lastGroupEl = null; lastGroupUser = null; lastDateKey = '';
+  // replay the login card's entrance animation instead of leaving it static
+  $('login-card').classList.remove('leaving');
+  $('login-card').style.animation = 'none';
+  void $('login-card').offsetWidth;
+  $('login-card').style.animation = '';
+  socket.disconnect();
+  socket.connect();
+}
+$('signout-btn').addEventListener('click', signOut);
+
+/* ════════════════════════════════════════════════
    MESSAGE RENDERING
    buildMessageDOM = pure DOM construction (reused by
    live append AND full rebuilds for hide/restore/select).
@@ -722,14 +1095,8 @@ function buildMessageDOM(data, isOwn, fromHistory) {
     if (!isOwn) {
       const av = document.createElement('div');
       av.className = 'avatar';
-      if (data.avatar) {
-        const img = document.createElement('img');
-        img.className = 'avatar-img'; img.src = data.avatar; img.alt = '';
-        av.appendChild(img);
-      } else {
-        av.style.background = userColor(user);
-        av.textContent = user[0].toUpperCase();
-      }
+      av.style.background = userColor(user);
+      av.textContent = user[0].toUpperCase();
       group.appendChild(av);
     }
     stack = document.createElement('div'); stack.className = 'bubble-stack';
@@ -896,6 +1263,7 @@ function sendMsg() {
   const r = btn.getBoundingClientRect();
   ps.burst(r.left + r.width/2, r.top + r.height/2, 'send');
   ripple(r.left + r.width/2, r.top + r.height/2);
+  window.__addGlassRipple?.(r.left + r.width/2, r.top + r.height/2);
   btn.classList.remove('fire'); void btn.offsetWidth; btn.classList.add('fire');
 }
 $('send-btn').addEventListener('click', sendMsg);
@@ -1077,6 +1445,7 @@ socket.on('message', data => {
   if (!isOwn) {
     const r = $('messages').getBoundingClientRect();
     ps.burst(r.left + 60, r.bottom - 75, 'recv');
+    window.__addGlassRipple?.(r.left + 60, r.bottom - 75);
   }
 });
 socket.on('msg-edited', ({ id, text }) => {
@@ -1140,5 +1509,5 @@ socket.on('user-count', n => { $('online-count').textContent = `${n} online`; })
 
 socket.on('disconnect', () => { if (hasJoinedOnce) showReconnectBanner(); });
 socket.on('connect', () => {
-  if (hasJoinedOnce && myName) socket.emit('join', { name: myName, clientId, avatar: myAvatar });
+  if (hasJoinedOnce && myName) socket.emit('join', { name: myName, clientId });
 });
