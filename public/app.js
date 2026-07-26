@@ -25,7 +25,7 @@ initLiquidGlass();
 const $ = id => document.getElementById(id);
 
 /* ════════════════════════════════════════════════
-   THEME SYSTEM — 15 selectable palettes. Switching a
+   THEME SYSTEM — 17 selectable palettes. Switching a
    theme recolors the glass tint (via CSS custom props),
    the Vanta fog background, and the browser tab/bookmark
    favicons. Colors crossfade smoothly (~650ms) instead of
@@ -82,15 +82,6 @@ const THEMES = [
     alert:'#c73e1d', bodyBg:'#ffb84d',
     popupBg:'rgba(255,255,255,0.92)', popupBorder:'rgba(255,255,255,0.7)',
     vanta:{ highlight:0xff6a3d, midtone:0xffce54, lowlight:0xd3450f, base:0xfff3d6 } },
-  { id:'amber', name:'Orange & Tan', slug:'amber', dark:false,
-    blue:'#d98a4e', blueDeep:'#b3652b', blueLight:'#eec295', bluePale:'#f7e2c8',
-    ink:'#3a2a18', inkSoft:'#8a6f4e',
-    glassBg:'rgba(255,255,255,0.06)', glassBorder:'rgba(255,255,255,0.4)',
-    ownBg:'rgba(217,138,78,0.32)', ownBorder:'rgba(217,138,78,0.45)',
-    recvBg:'rgba(255,255,255,0.64)', recvBorder:'rgba(255,255,255,0.55)',
-    alert:'#9c4b1e', bodyBg:'#e8c69a',
-    popupBg:'rgba(255,255,255,0.92)', popupBorder:'rgba(255,255,255,0.7)',
-    vanta:{ highlight:0xd98a4e, midtone:0xeec295, lowlight:0xb3652b, base:0xfff6e8 } },
   { id:'gold', name:'Yellow & White', slug:'gold', dark:false,
     blue:'#e0b83f', blueDeep:'#b6920f', blueLight:'#f2dd8f', bluePale:'#faf0cf',
     ink:'#3a3010', inkSoft:'#8a7a40',
@@ -110,23 +101,23 @@ const THEMES = [
     popupBg:'rgba(255,255,255,0.92)', popupBorder:'rgba(255,255,255,0.7)',
     vanta:{ highlight:0x9fbf94, midtone:0xd9d0b0, lowlight:0x6f9060, base:0xf5f0e0 } },
   { id:'hacker', name:'Hacker Green & Black', slug:'hacker', dark:true,
-    blue:'#39ff6a', blueDeep:'#1fbf4a', blueLight:'#8dffab', bluePale:'#c9ffd6',
-    ink:'#c9ffd2', inkSoft:'#5fcf7d',
-    glassBg:'rgba(10,20,12,0.42)', glassBorder:'rgba(57,255,106,0.22)',
-    ownBg:'rgba(57,255,106,0.22)', ownBorder:'rgba(57,255,106,0.45)',
-    recvBg:'rgba(10,26,14,0.66)', recvBorder:'rgba(57,255,106,0.20)',
-    alert:'#ff5555', bodyBg:'#050a06',
-    popupBg:'rgba(6,16,8,0.94)', popupBorder:'rgba(57,255,106,0.25)',
-    vanta:{ highlight:0x39ff6a, midtone:0x0f4d24, lowlight:0x030906, base:0x000000 } },
+    blue:'#4dff85', blueDeep:'#2fd162', blueLight:'#a3ffc0', bluePale:'#d9ffe4',
+    ink:'#d9ffe0', inkSoft:'#72d68f',
+    glassBg:'rgba(16,30,18,0.42)', glassBorder:'rgba(77,255,133,0.22)',
+    ownBg:'rgba(77,255,133,0.24)', ownBorder:'rgba(77,255,133,0.46)',
+    recvBg:'rgba(18,36,20,0.66)', recvBorder:'rgba(77,255,133,0.20)',
+    alert:'#ff5555', bodyBg:'#0a140c',
+    popupBg:'rgba(12,24,14,0.94)', popupBorder:'rgba(77,255,133,0.25)',
+    vanta:{ highlight:0x4dff85, midtone:0x1a6b38, lowlight:0x0a1e0f, base:0x040a05 } },
   { id:'forest', name:'Brown & Dark Green', slug:'forest', dark:true,
-    blue:'#9c7a4e', blueDeep:'#6e5333', blueLight:'#c9ac7c', bluePale:'#e3d3b3',
-    ink:'#eee3cf', inkSoft:'#b7a684',
-    glassBg:'rgba(18,22,16,0.42)', glassBorder:'rgba(255,255,255,0.13)',
-    ownBg:'rgba(156,122,78,0.34)', ownBorder:'rgba(156,122,78,0.48)',
-    recvBg:'rgba(28,34,24,0.64)', recvBorder:'rgba(255,255,255,0.13)',
-    alert:'#e08a3e', bodyBg:'#141d14',
-    popupBg:'rgba(20,26,18,0.94)', popupBorder:'rgba(255,255,255,0.12)',
-    vanta:{ highlight:0x9c7a4e, midtone:0x2f4a2f, lowlight:0x121a10, base:0x000000 } },
+    blue:'#b08f61', blueDeep:'#82643f', blueLight:'#d4bd8f', bluePale:'#ecdfc4',
+    ink:'#eee3cf', inkSoft:'#c3b494',
+    glassBg:'rgba(28,36,26,0.42)', glassBorder:'rgba(255,255,255,0.13)',
+    ownBg:'rgba(176,143,97,0.34)', ownBorder:'rgba(176,143,97,0.48)',
+    recvBg:'rgba(40,50,36,0.64)', recvBorder:'rgba(255,255,255,0.13)',
+    alert:'#e08a3e', bodyBg:'#1f2e1f',
+    popupBg:'rgba(30,38,28,0.94)', popupBorder:'rgba(255,255,255,0.12)',
+    vanta:{ highlight:0xb08f61, midtone:0x3f6a3f, lowlight:0x1e2e18, base:0x0a120a } },
   { id:'cobalt', name:'Blue & Deep Blue', slug:'cobalt', dark:false,
     blue:'#3a6fd8', blueDeep:'#1c3f96', blueLight:'#8fb0ee', bluePale:'#d3e0fb',
     ink:'#101a33', inkSoft:'#48587a',
@@ -172,6 +163,33 @@ const THEMES = [
     alert:'#8a6a2e', bodyBg:'#e8dcc0',
     popupBg:'rgba(255,255,255,0.93)', popupBorder:'rgba(255,255,255,0.72)',
     vanta:{ highlight:0xc9a865, midtone:0xe0cc9a, lowlight:0xa3813e, base:0xfaf3e2 } },
+  { id:'blue', name:'Blue', slug:'blue', dark:false,
+    blue:'#2f7fe0', blueDeep:'#1a5fc0', blueLight:'#7fb3f2', bluePale:'#d6e8fb',
+    ink:'#0d1f3a', inkSoft:'#3f5a7a',
+    glassBg:'rgba(255,255,255,0.07)', glassBorder:'rgba(255,255,255,0.42)',
+    ownBg:'rgba(47,127,224,0.34)', ownBorder:'rgba(47,127,224,0.48)',
+    recvBg:'rgba(255,255,255,0.66)', recvBorder:'rgba(255,255,255,0.56)',
+    alert:'#1a5fc0', bodyBg:'#5b9bf0',
+    popupBg:'rgba(255,255,255,0.92)', popupBorder:'rgba(255,255,255,0.7)',
+    vanta:{ highlight:0x5b9bf0, midtone:0x2f7fe0, lowlight:0x1a5fc0, base:0xeaf3ff } },
+  { id:'purple', name:'Purple', slug:'purple', dark:false,
+    blue:'#9b5fe0', blueDeep:'#7333c4', blueLight:'#c7a3f2', bluePale:'#ede0fb',
+    ink:'#241238', inkSoft:'#5e4a80',
+    glassBg:'rgba(255,255,255,0.07)', glassBorder:'rgba(255,255,255,0.42)',
+    ownBg:'rgba(155,95,224,0.34)', ownBorder:'rgba(155,95,224,0.48)',
+    recvBg:'rgba(255,255,255,0.66)', recvBorder:'rgba(255,255,255,0.56)',
+    alert:'#7333c4', bodyBg:'#8a5fd6',
+    popupBg:'rgba(255,255,255,0.92)', popupBorder:'rgba(255,255,255,0.7)',
+    vanta:{ highlight:0xa97ae8, midtone:0x9b5fe0, lowlight:0x7333c4, base:0xf0e8ff } },
+  { id:'red', name:'Red', slug:'red', dark:false,
+    blue:'#e0483f', blueDeep:'#b3271f', blueLight:'#f2938a', bluePale:'#fbdcd9',
+    ink:'#3a120e', inkSoft:'#8a4a40',
+    glassBg:'rgba(255,255,255,0.07)', glassBorder:'rgba(255,255,255,0.42)',
+    ownBg:'rgba(224,72,63,0.34)', ownBorder:'rgba(224,72,63,0.48)',
+    recvBg:'rgba(255,255,255,0.66)', recvBorder:'rgba(255,255,255,0.56)',
+    alert:'#b3271f', bodyBg:'#e8695f',
+    popupBg:'rgba(255,255,255,0.92)', popupBorder:'rgba(255,255,255,0.7)',
+    vanta:{ highlight:0xe8695f, midtone:0xe0483f, lowlight:0xb3271f, base:0xfff0ee } },
 ];
 
 const THEME_VAR_MAP = {
@@ -373,9 +391,10 @@ class Particles {
   constructor(c){this.c=c;this.ctx=c.getContext('2d');this.p=[];this.raf=null;this._r();window.addEventListener('resize',()=>this._r());}
   _r(){this.c.width=innerWidth;this.c.height=innerHeight;}
   burst(px,py,type){
+    const theme = getTheme(currentThemeId);
     const cfg = type==='send'
-      ? {n:14,vy:-2.0,spd:[2.5,6],sz:[1.5,3.5],dec:[0.022,0.036],cols:['#3fa9e0','#1f7fc9','#ffffff','#a3cfff']}
-      : {n:9,vy:-1.2,spd:[1.2,3.4],sz:[1.2,2.6],dec:[0.026,0.040],cols:['#ffffff','#dff0ff','#bfe6ff']};
+      ? {n:14,vy:-2.0,spd:[2.5,6],sz:[1.5,3.5],dec:[0.022,0.036],cols:[theme.blue,theme.blueDeep,'#ffffff',theme.blueLight]}
+      : {n:9,vy:-1.2,spd:[1.2,3.4],sz:[1.2,2.6],dec:[0.026,0.040],cols:['#ffffff',theme.bluePale,theme.blueLight]};
     for(let i=0;i<cfg.n;i++){
       const a=(Math.PI*2*i/cfg.n)+(Math.random()-0.5)*1.1;
       const s=cfg.spd[0]+Math.random()*(cfg.spd[1]-cfg.spd[0]);
