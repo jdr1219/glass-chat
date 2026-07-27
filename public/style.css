@@ -17,9 +17,6 @@
   --popup-border: rgba(255, 255, 255, 0.7);
   --ease: cubic-bezier(.22, 1, .36, 1);
   --ease-in: cubic-bezier(.4, 0, 1, 1);
-  --mx: 50%;
-  --my: 20%;
-  --glow: 0;
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { height: 100%; overflow: hidden; touch-action: manipulation; }
@@ -45,34 +42,6 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; over
   overflow: hidden;
   isolation: isolate;
 }
-/* Subtle static sheen — a soft diagonal band of light, fixed in place
-   rather than constantly drifting. Restraint reads as more considered. */
-.glass::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(125deg,
-    transparent 40%,
-    color-mix(in srgb, var(--blue-pale) 55%, transparent) 48%,
-    color-mix(in srgb, var(--blue-pale) 85%, transparent) 50%,
-    color-mix(in srgb, var(--blue-pale) 55%, transparent) 52%,
-    transparent 60%);
-  pointer-events: none;
-  z-index: -1;
-  mix-blend-mode: overlay;
-}
-/* Cursor-reactive glow — fades in on hover, follows the pointer via --mx/--my,
-   simulating specular highlights "responding to motion". */
-.glass::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at var(--mx) var(--my), color-mix(in srgb, var(--blue-light) 60%, transparent), transparent 55%);
-  opacity: var(--glow);
-  transition: opacity .35s var(--ease);
-  pointer-events: none;
-  z-index: -1;
-}
 
 /* LOGIN */
 .login-card { width: min(400px,100%); padding: 56px 44px 48px; border-radius: 28px; text-align: center; will-change: transform,opacity,filter; animation: cardIn .55s var(--ease) both; }
@@ -86,13 +55,13 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; over
 .login-card.leaving { animation: cardOut .28s var(--ease-in) forwards; }
 
 .logo-wrap { display:inline-block; position:relative; margin-bottom:22px; }
-.logo-img { width:78px; height:78px; border-radius:20px; object-fit:cover; display:block; box-shadow:0 12px 30px color-mix(in srgb, var(--blue) 40%, transparent),0 0 0 1px rgba(255,255,255,.4); animation: logoIn .6s var(--ease) .05s both; }
+.logo-img { width:78px; height:78px; border-radius:50%; object-fit:cover; display:block; box-shadow:0 12px 30px color-mix(in srgb, var(--blue) 40%, transparent),0 0 0 1px rgba(255,255,255,.4); animation: logoIn .6s var(--ease) .05s both; }
 @keyframes logoIn { from{opacity:0;transform:scale(.7) translateY(8px);} to{opacity:1;transform:scale(1) translateY(0);} }
 
 /* ── avatar upload badge — shared by the first-time setup screen and the profile settings dropdown ── */
 .avatar-edit-overlay { position:absolute; inset:0; border-radius:50%; border:none; background:rgba(10,20,30,0); color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity .18s var(--ease), background .18s var(--ease); }
 .logo-wrap:hover .avatar-edit-overlay,
-.profile-avatar-edit-wrap:hover .avatar-edit-overlay { opacity:1; background:rgba(10,20,30,.45); }
+.profile-avatar-edit-wrap:hover .avatar-edit-overlay { opacity:1; background:color-mix(in srgb, var(--blue-deep) 62%, transparent); }
 .avatar-edit-overlay svg { width:22px; height:22px; filter:drop-shadow(0 1px 2px rgba(0,0,0,.45)); pointer-events:none; }
 .avatar-edit-overlay:active svg { transform:scale(.9); }
 
@@ -117,7 +86,7 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; over
 
 .chat-header { flex-shrink:0; padding:13px 18px; background:rgba(255,255,255,0.14); border-bottom:1px solid rgba(255,255,255,0.30); display:flex; align-items:center; justify-content:space-between; gap:10px; }
 .header-left { display:flex; align-items:center; gap:9px; min-width:0; }
-.header-logo { width:28px; height:28px; border-radius:8px; object-fit:cover; flex-shrink:0; box-shadow:0 2px 8px rgba(15,40,60,.20); }
+.header-logo { width:28px; height:28px; border-radius:50%; object-fit:cover; flex-shrink:0; box-shadow:0 2px 8px rgba(15,40,60,.20); }
 .header-title { font-size:15px; font-weight:700; color:var(--ink); letter-spacing:-.3px; max-width:130px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .header-right { display:flex; align-items:center; gap:6px; }
 

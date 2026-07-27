@@ -1,31 +1,10 @@
 /* ════════ Glass Chat — client ════════ */
 const socket = io();
 
-/* ── Liquid Glass: cursor-reactive specular highlight ──
-   Tracks pointer position over each .glass surface and updates
-   --mx/--my so the highlight follows the cursor, approximating
-   how real glass/liquid concentrates light toward a viewing angle. */
-function initLiquidGlass() {
-  document.querySelectorAll('.glass').forEach(el => {
-    el.addEventListener('pointermove', e => {
-      const r = el.getBoundingClientRect();
-      const x = ((e.clientX - r.left) / r.width) * 100;
-      const y = ((e.clientY - r.top) / r.height) * 100;
-      el.style.setProperty('--mx', x + '%');
-      el.style.setProperty('--my', y + '%');
-      el.style.setProperty('--glow', '1');
-    });
-    el.addEventListener('pointerleave', () => {
-      el.style.setProperty('--glow', '0');
-    });
-  });
-}
-initLiquidGlass();
-
 const $ = id => document.getElementById(id);
 
 /* ════════════════════════════════════════════════
-   THEME SYSTEM — 17 selectable palettes. Switching a
+   THEME SYSTEM — 15 selectable palettes. Switching a
    theme recolors the glass tint (via CSS custom props),
    the Vanta fog background, and the browser tab/bookmark
    favicons. Colors crossfade smoothly (~650ms) instead of
@@ -101,23 +80,23 @@ const THEMES = [
     popupBg:'rgba(255,255,255,0.92)', popupBorder:'rgba(255,255,255,0.7)',
     vanta:{ highlight:0x9fbf94, midtone:0xd9d0b0, lowlight:0x6f9060, base:0xf5f0e0 } },
   { id:'hacker', name:'Hacker Green & Black', slug:'hacker', dark:true,
-    blue:'#4dff85', blueDeep:'#2fd162', blueLight:'#a3ffc0', bluePale:'#d9ffe4',
-    ink:'#d9ffe0', inkSoft:'#72d68f',
-    glassBg:'rgba(16,30,18,0.42)', glassBorder:'rgba(77,255,133,0.22)',
-    ownBg:'rgba(77,255,133,0.24)', ownBorder:'rgba(77,255,133,0.46)',
-    recvBg:'rgba(18,36,20,0.66)', recvBorder:'rgba(77,255,133,0.20)',
-    alert:'#ff5555', bodyBg:'#0a140c',
-    popupBg:'rgba(12,24,14,0.94)', popupBorder:'rgba(77,255,133,0.25)',
-    vanta:{ highlight:0x4dff85, midtone:0x1a6b38, lowlight:0x0a1e0f, base:0x040a05 } },
-  { id:'forest', name:'Brown & Dark Green', slug:'forest', dark:true,
-    blue:'#b08f61', blueDeep:'#82643f', blueLight:'#d4bd8f', bluePale:'#ecdfc4',
-    ink:'#eee3cf', inkSoft:'#c3b494',
-    glassBg:'rgba(28,36,26,0.42)', glassBorder:'rgba(255,255,255,0.13)',
-    ownBg:'rgba(176,143,97,0.34)', ownBorder:'rgba(176,143,97,0.48)',
-    recvBg:'rgba(40,50,36,0.64)', recvBorder:'rgba(255,255,255,0.13)',
-    alert:'#e08a3e', bodyBg:'#1f2e1f',
-    popupBg:'rgba(30,38,28,0.94)', popupBorder:'rgba(255,255,255,0.12)',
-    vanta:{ highlight:0xb08f61, midtone:0x3f6a3f, lowlight:0x1e2e18, base:0x0a120a } },
+    blue:'#39ff6a', blueDeep:'#1fbf4a', blueLight:'#8dffab', bluePale:'#c9ffd6',
+    ink:'#c9ffd2', inkSoft:'#5fcf7d',
+    glassBg:'rgba(10,20,12,0.42)', glassBorder:'rgba(57,255,106,0.22)',
+    ownBg:'rgba(57,255,106,0.22)', ownBorder:'rgba(57,255,106,0.45)',
+    recvBg:'rgba(10,26,14,0.66)', recvBorder:'rgba(57,255,106,0.20)',
+    alert:'#ff5555', bodyBg:'#050a06',
+    popupBg:'rgba(6,16,8,0.94)', popupBorder:'rgba(57,255,106,0.25)',
+    vanta:{ highlight:0x39ff6a, midtone:0x0f4d24, lowlight:0x030906, base:0x000000 } },
+  { id:'forest', name:'Brown & Forest Green', slug:'forest', dark:true,
+    blue:'#a9884f', blueDeep:'#7a5f38', blueLight:'#cbb27f', bluePale:'#ecdfc0',
+    ink:'#f2ecd8', inkSoft:'#c9c19a',
+    glassBg:'rgba(30,58,40,0.42)', glassBorder:'rgba(255,255,255,0.13)',
+    ownBg:'rgba(169,136,79,0.34)', ownBorder:'rgba(169,136,79,0.48)',
+    recvBg:'rgba(42,74,52,0.64)', recvBorder:'rgba(255,255,255,0.13)',
+    alert:'#c97a3e', bodyBg:'#1f4d2e',
+    popupBg:'rgba(22,44,30,0.94)', popupBorder:'rgba(255,255,255,0.12)',
+    vanta:{ highlight:0xa9884f, midtone:0x2d6a42, lowlight:0x14301e, base:0x0a1810 } },
   { id:'cobalt', name:'Blue & Deep Blue', slug:'cobalt', dark:false,
     blue:'#3a6fd8', blueDeep:'#1c3f96', blueLight:'#8fb0ee', bluePale:'#d3e0fb',
     ink:'#101a33', inkSoft:'#48587a',
@@ -163,33 +142,15 @@ const THEMES = [
     alert:'#8a6a2e', bodyBg:'#e8dcc0',
     popupBg:'rgba(255,255,255,0.93)', popupBorder:'rgba(255,255,255,0.72)',
     vanta:{ highlight:0xc9a865, midtone:0xe0cc9a, lowlight:0xa3813e, base:0xfaf3e2 } },
-  { id:'blue', name:'Blue', slug:'blue', dark:false,
-    blue:'#2f7fe0', blueDeep:'#1a5fc0', blueLight:'#7fb3f2', bluePale:'#d6e8fb',
-    ink:'#0d1f3a', inkSoft:'#3f5a7a',
+  { id:'berry', name:'Blue, Purple & Red', slug:'berry', dark:false,
+    blue:'#3d6fe0', blueDeep:'#8a3fd6', blueLight:'#e0546b', bluePale:'#f2d3db',
+    ink:'#191233', inkSoft:'#5a4a78',
     glassBg:'rgba(255,255,255,0.07)', glassBorder:'rgba(255,255,255,0.42)',
-    ownBg:'rgba(47,127,224,0.34)', ownBorder:'rgba(47,127,224,0.48)',
+    ownBg:'rgba(61,111,224,0.32)', ownBorder:'rgba(61,111,224,0.46)',
     recvBg:'rgba(255,255,255,0.66)', recvBorder:'rgba(255,255,255,0.56)',
-    alert:'#1a5fc0', bodyBg:'#5b9bf0',
+    alert:'#b3271f', bodyBg:'#5a7ee8',
     popupBg:'rgba(255,255,255,0.92)', popupBorder:'rgba(255,255,255,0.7)',
-    vanta:{ highlight:0x5b9bf0, midtone:0x2f7fe0, lowlight:0x1a5fc0, base:0xeaf3ff } },
-  { id:'purple', name:'Purple', slug:'purple', dark:false,
-    blue:'#9b5fe0', blueDeep:'#7333c4', blueLight:'#c7a3f2', bluePale:'#ede0fb',
-    ink:'#241238', inkSoft:'#5e4a80',
-    glassBg:'rgba(255,255,255,0.07)', glassBorder:'rgba(255,255,255,0.42)',
-    ownBg:'rgba(155,95,224,0.34)', ownBorder:'rgba(155,95,224,0.48)',
-    recvBg:'rgba(255,255,255,0.66)', recvBorder:'rgba(255,255,255,0.56)',
-    alert:'#7333c4', bodyBg:'#8a5fd6',
-    popupBg:'rgba(255,255,255,0.92)', popupBorder:'rgba(255,255,255,0.7)',
-    vanta:{ highlight:0xa97ae8, midtone:0x9b5fe0, lowlight:0x7333c4, base:0xf0e8ff } },
-  { id:'red', name:'Red', slug:'red', dark:false,
-    blue:'#e0483f', blueDeep:'#b3271f', blueLight:'#f2938a', bluePale:'#fbdcd9',
-    ink:'#3a120e', inkSoft:'#8a4a40',
-    glassBg:'rgba(255,255,255,0.07)', glassBorder:'rgba(255,255,255,0.42)',
-    ownBg:'rgba(224,72,63,0.34)', ownBorder:'rgba(224,72,63,0.48)',
-    recvBg:'rgba(255,255,255,0.66)', recvBorder:'rgba(255,255,255,0.56)',
-    alert:'#b3271f', bodyBg:'#e8695f',
-    popupBg:'rgba(255,255,255,0.92)', popupBorder:'rgba(255,255,255,0.7)',
-    vanta:{ highlight:0xe8695f, midtone:0xe0483f, lowlight:0xb3271f, base:0xfff0ee } },
+    vanta:{ highlight:0xe0546b, midtone:0x8a3fd6, lowlight:0x3d6fe0, base:0xf5eef8 } },
 ];
 
 const THEME_VAR_MAP = {
@@ -253,6 +214,22 @@ function applyFavicon(theme) {
   setFaviconLink('apple-touch', `apple-touch-icon${suffix}.png`, 'apple-touch-icon.png');
 }
 
+/* Default profile photo — a circle in the current theme's colors with the
+   first letter of the person's name, used anywhere someone hasn't uploaded
+   a real photo (welcome screen, header, profile menu). */
+function letterAvatarDataUrl(letter, theme) {
+  const ch = (letter || '?').toString().slice(0, 1).toUpperCase();
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">`
+    + `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">`
+    + `<stop offset="0%" stop-color="${theme.blue}"/><stop offset="100%" stop-color="${theme.blueDeep}"/>`
+    + `</linearGradient></defs>`
+    + `<circle cx="32" cy="32" r="32" fill="url(#g)"/>`
+    + `<text x="32" y="33" font-family="Inter, -apple-system, Helvetica, sans-serif" font-size="30" `
+    + `font-weight="700" fill="#ffffff" text-anchor="middle" dominant-baseline="central">${ch}</text>`
+    + `</svg>`;
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+}
+
 function refreshThemeGridSelection() {
   themeGridContainers.forEach(container => {
     container.querySelectorAll('.theme-mini-swatch').forEach(el => {
@@ -311,7 +288,10 @@ function buildThemeSwatch(theme) {
   btn.dataset.themeId = theme.id;
   btn.style.background = `linear-gradient(135deg, ${theme.blue} 0%, ${theme.blueDeep} 55%, ${theme.bodyBg} 100%)`;
   btn.innerHTML = '<svg class="theme-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
-  btn.addEventListener('click', () => applyTheme(theme.id, { animate: true }));
+  btn.addEventListener('click', () => {
+    applyTheme(theme.id, { animate: true });
+    if (typeof refreshDefaultAvatars === 'function') refreshDefaultAvatars();
+  });
   return btn;
 }
 function renderThemeGrid(container) {
@@ -524,9 +504,25 @@ function hideMessageLocally(msg, alsoUnsend) {
    First-time visitors get a one-time welcome screen to set a name + photo. */
 function showFieldError(msg) { $('field-error').textContent = msg || ''; }
 
+/* Keeps any currently-shown default (letter) avatars in sync with the
+   active theme and the name someone's typed so far — real uploaded
+   photos are never touched by this. */
+function refreshDefaultAvatars() {
+  const theme = getTheme(currentThemeId);
+  if (!myAvatar) {
+    $('header-avatar').src = letterAvatarDataUrl(myName, theme);
+    if (pendingProfileMenuAvatar === undefined) {
+      $('profile-menu-avatar-preview').src = letterAvatarDataUrl(myName, theme);
+    }
+  }
+  if (!pendingSetupAvatar) {
+    $('setup-avatar-preview').src = letterAvatarDataUrl($('name-input').value.trim(), theme);
+  }
+}
+
 function updateHeaderProfile() {
   $('header-username').textContent = myName || 'Glass Chat';
-  $('header-avatar').src = myAvatar || 'favicon-32.png';
+  $('header-avatar').src = myAvatar || letterAvatarDataUrl(myName, getTheme(currentThemeId));
 }
 
 function goStraightToChat() {
@@ -539,6 +535,9 @@ function goStraightToChat() {
 
 function showWelcomeScreen() {
   $('login-screen').classList.remove('hidden');
+  if (!pendingSetupAvatar) {
+    $('setup-avatar-preview').src = letterAvatarDataUrl($('name-input').value.trim(), getTheme(currentThemeId));
+  }
   setTimeout(() => $('name-input').focus(), 50);
 }
 
@@ -604,6 +603,11 @@ async function joinChat() {
 }
 $('join-btn').addEventListener('click', joinChat);
 $('name-input').addEventListener('keydown', e => { if (e.key==='Enter') joinChat(); });
+$('name-input').addEventListener('input', () => {
+  if (!pendingSetupAvatar) {
+    $('setup-avatar-preview').src = letterAvatarDataUrl($('name-input').value.trim(), getTheme(currentThemeId));
+  }
+});
 
 socket.on('name-taken', () => {
   $('join-btn').disabled = false;
@@ -643,7 +647,7 @@ $('profile-trigger').addEventListener('click', e => {
   menu.classList.toggle('open');
   if (opening) {
     $('profile-menu-name-input').value = myName;
-    $('profile-menu-avatar-preview').src = myAvatar || 'apple-touch-icon.png';
+    $('profile-menu-avatar-preview').src = myAvatar || letterAvatarDataUrl(myName, getTheme(currentThemeId));
     $('profile-menu-error').textContent = '';
     pendingProfileMenuAvatar = undefined;
   }
@@ -722,7 +726,7 @@ async function signOut() {
 
   $('name-input').value = '';
   showFieldError('');
-  $('setup-avatar-preview').src = 'apple-touch-icon.png';
+  $('setup-avatar-preview').src = letterAvatarDataUrl('', getTheme(currentThemeId));
 
   $('login-screen').classList.remove('hidden');
   $('login-card').classList.remove('leaving');
